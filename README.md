@@ -45,3 +45,6 @@ This project performs uncertainty quantification for prostate MRI. Our goals are
 
 - **Further Documentation:**  
   Please refer to the individual repositories for more detailed instructions on usage and configuration.
+
+- **Scripts:**
+   The post-processing script(s) were taken from the Reader Study Project within the Repository: direct-with-averages
