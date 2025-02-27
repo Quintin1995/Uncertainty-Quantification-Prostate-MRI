@@ -35,8 +35,8 @@ prediction_dirs:
 # instead of working with exclusion we work with inclusion.
 inclusion_list: #null
   # - "0001"
-  # - "0002"
-  # - "0003"
+  - "0002"
+  - "0003"
   # - "0004"
   # - "0005"
   # - "0006"
@@ -71,7 +71,7 @@ inclusion_list: #null
   # - "0035"
   # - "0036"
   # - "0037"
-  - "0038"
+  # - "0038"
   # - "0039"
   # - "0040"
   # - "0041"
@@ -159,10 +159,10 @@ inclusion_list: #null
   # - "0123"
 ####  - "0124"      # t2ddicom with adc/dwi=GOOD | recon with t2dicom=GOOD   (CHECK SEEMS FINE)     
   # - "0125"
-  # - "0126"
+  # - "0126"nano
   # - "0127"
   # - "0128"
-  - "0129"
+  # - "0129"
   # - "0130"
   # - "0131"
   # - "0132"

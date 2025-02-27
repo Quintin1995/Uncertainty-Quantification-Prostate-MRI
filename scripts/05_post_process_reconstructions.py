@@ -33,7 +33,8 @@ def parse_args(verbose: bool = False):
     parser.add_argument("-cfg",
                         "--config_fpath",
                         type=str,
-                        default="/home1/p290820/repos/direct-with-averages/projects/qvl_nki_rs/configs/post_process_config.yaml",
+                        # default="/home1/p290820/repos/direct-with-averages/projects/qvl_nki_rs/configs/post_process_config.yaml",
+                        default="/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/post_processing/adaptive_recon.yaml",
                         help="Path to the config file.")
     
     a = parser.parse_args()
