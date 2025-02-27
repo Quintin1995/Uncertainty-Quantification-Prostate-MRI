@@ -1,35 +1,35 @@
 # This Config file was taken from the repo: direct-with-averages --> Projects --> qvl_rs --> configs
 
 
-source_dir: '/scratch/p290820/datasets/003_umcg_pst_ksps'        # Where the kspace data is stored
-do_make_dicom_like: true                                         # Make recon dicom-like based on shape from header information
-target_only: false                                               # only process the target
-log_dir: '/home1/p290820/projects/03_nki_reader_study/logs' # The path to the log directory
+source_dir: '/scratch/p290820/datasets/003_umcg_pst_ksps'                     # Where the kspace data is stored
+do_make_dicom_like: true                                                      # Make recon dicom-like based on shape from header information
+target_only: false                                                            # only process the target
+log_dir: '/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/logs'  # The path to the log directory
 
 # The path to the database file. The database contains information about the kspace, dicom and patient information
 db_fpath: '/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'
 
-# Where the inference files of the vsharp model are stored. This folder should contain patient dirs with predicted .h5 files
+# OLD Where the inference files of the vsharp model are stored. This folder should contain patient dirs with predicted .h5 files
 # prediction_dirs:
 #   1x: '/scratch/hb-pca-rad/projects/03_nki_reader_study/output/umcg/1x'
 #   3x: '/scratch/hb-pca-rad/projects/03_nki_reader_study/output/umcg/3x'
 #   6x: '/scratch/hb-pca-rad/projects/03_nki_reader_study/output/umcg/6x'
 prediction_dirs:
   debug: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/debug'
-  1x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  2x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  3x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  4x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  5x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  6x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  7x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  8x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  9x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  10x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  11x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  12x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  13x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
-  14x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 1x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 2x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 3x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 4x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 5x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 6x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 7x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 8x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 9x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 10x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 11x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 12x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 13x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
+  # 14x: '/scratch/hb-pca-rad/projects/04_personalized_recon/reconstructions/1x'
 
 
 # instead of working with exclusion we work with inclusion.

@@ -70,21 +70,19 @@ def load_config():
 
 
 def print_start_message():
-    print("\nTakes in a directory of validation predictions and a directory of validation targets and plots them side by side for comparison.")
+    print("\nTakes in a directory of inferences of the vSHARP reconstruction model and a directory of ground truths (targets) and plots them side by side for comparison.")
     print("-> Computes the SSIM, PSNR, and NMSE between the predictions and targets and saves them in the h5 files.")
     print("-> Saves the predictions and targets as nifti files for visualization in ITK-SNAP.")
     print("-> Current working directory: ", os.getcwd(), "\n\n")
 
 
 def histogram_normalization(src_img: np.ndarray, ref_img: np.ndarray) -> np.ndarray:
-    # Flatten the images
     src_img_flat = src_img.flatten()
     ref_img_flat = ref_img.flatten()
 
     src_img_flat = np.round(src_img_flat).astype(int)
     ref_img_flat = np.round(ref_img_flat).astype(int)
 
-    # Compute histograms
     src_hist, src_bins = np.histogram(src_img_flat, bins=256)
     ref_hist, ref_bins = np.histogram(ref_img_flat, bins=256)
 
@@ -726,7 +724,6 @@ def postprocess_all_patients(
     """
     for idx, pat_dir in enumerate(pat_dirs):
         pat_id = pat_dir.parts[-1]
-        logger.info()
         logger.info(f"Loading patient {idx+1}/{len(pat_dirs)}:\nPatient ID: {pat_id}")
         hf_paths = glob.glob(str(pat_dir) + '/*.h5') # find the DL recon h5 file (vSHARP 4X recon in this case 20240207)
         
@@ -840,7 +837,6 @@ def setup_logger(log_dir: Path, use_time: bool = True, part_fname: str = None) -
 
 ####################################################################################################
 # Description:
-# Post-process the reconstructions from the vSHARP model.
 # This code is used to post-process the reconstructions from the vSHARP model.
 # The reconstructions are stored in h5 files and are post-processed in the following way:
 # 1. The reconstructions are saved as nifti files.
@@ -849,6 +845,15 @@ def setup_logger(log_dir: Path, use_time: bool = True, part_fname: str = None) -
 # 4. The reconstructions are evaluated using the SSIM, PSNR, and NMSE metrics.
 # 5. The reconstructions are evaluated using the SSIM, PSNR, and NMSE metrics on the dicom-like reconstructions.
 if __name__ == "__main__":
+
+    print("\n\n\n")
+    print("Please make sure the following modules are loaded before running this script:")
+    print("module purge")
+    print("module load CUDA/11.7.0")
+    print("module load Python/3.9.6-GCCcore-11.2.0")
+    print("module load NCCL/2.12.12-GCCcore-11.3.0-CUDA-11.7.0")
+    input("Press Enter to continue...")
+
     cfg = load_config()
     logger = setup_logger(cfg['log_dir'], use_time=False, part_fname='post_process_inference')
     
