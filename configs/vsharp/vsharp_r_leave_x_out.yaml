@@ -482,16 +482,16 @@ inference:
     dataset:
         name: FastMRIAvgComb
         avg_acceleration: 1                     # The reached acceleration due to leaving out averages for example
-        avg_collapse_strat: allavg              # qvl: options: avg1, avg2, avg3, allavg       #[allavg=(avg1+avg3)/2+avg2)]
+        avg_collapse_strat: avg1              # qvl: options: avg1, avg2, avg3, allavg       #[allavg=(avg1+avg3)/2+avg2)]
         store_applied_acs_mask: True            # qvl: Stores the ACS region applied to avg1+avg2
         transforms:
             use_seed: True
-            masking:
-                name: FastMRIEquispaced
+            masking: null
+                # name: FastMRIEquispaced
                 # accelerations: [2]
                 # center_fractions: [0.16]
-                accelerations: [8]                                             # [2, 3, 4, 5, 6, 7, 8, 9, 10]
-                center_fractions: [0.04]        # [0.16, 0.107, 0.08, 0.064, 0.05333, 0.046, 0.04, 0.035, 0.032] 
+                # accelerations: [8]                                             # [2, 3, 4, 5, 6, 7, 8, 9, 10]
+                # center_fractions: [0.04]        # [0.16, 0.107, 0.08, 0.064, 0.05333, 0.046, 0.04, 0.035, 0.032] 
             cropping:
                 crop: null
             sensitivity_map_estimation:
