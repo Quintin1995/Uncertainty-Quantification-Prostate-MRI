@@ -174,3 +174,4 @@ cython_debug/
 /lists
 .db
 /jupyter_env
+/tmp
