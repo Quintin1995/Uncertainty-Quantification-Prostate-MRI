@@ -481,15 +481,16 @@ inference:
     batch_size: 3
     dataset:
         name: FastMRIAvgComb
-        avg_acceleration: 3                   # The reached acceleration due to leaving out averages for example
+        avg_acceleration: 3                   # qvl: The reached acceleration due to leaving out averages for example
         avg_collapse_strat: avg1              # qvl: options: avg1, avg2, avg3, allavg       #[allavg=(avg1+avg3)/2+avg2)]
         store_applied_acs_mask: True          # qvl: Stores the ACS region applied to avg1+avg2
         uncertainty:
             echo_train_length: 25                  # qvl: The echo train length of the data
             leave_out_echo_trains: 2               # R=3: (more echo trains): Equivalent to Leave-Two-Out (L2O), ~18% removal (11 total → 2 out) if we consider the ETL=25 and we have 550 lines, with half sampled =275lines. that means 11 echo trains
             # leave_out_echo_trains: 1             # R=6: (less echo trains): Equivalent to Leave-One-Out (LOO), ~16-18% removal (6 total → 1 out) if we consider the ETL=25 and we have 550 lines, with half sampled =275lines and half of this is sampled due to parallel imaging factor 2x. that means 5.5 echo trains
-            # in the code we calculate the number of echo trains.
-            seed: 85879                            # seed for selecting echo trains so that it is the same for each patient.
+            add_gaussian_noise: False              # qvl: Add Gaussian noise to the input data
+            noise_fraction: 0.0005                 # qvl: The fraction of the maximum value of the input data to be used as the standard deviation of the Gaussian noise
+            # seed: 85879                          # seed for selecting echo trains so that it is the same for each patient.
         transforms:
             use_seed: True
             masking: null
