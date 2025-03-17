@@ -175,3 +175,4 @@ cython_debug/
 .db
 /jupyter_env
 /tmp
+/databases
