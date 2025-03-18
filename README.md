@@ -51,16 +51,23 @@ This project performs uncertainty quantification for prostate MRI. Our goals are
 
 
 ## Running
-1. SSH into Habrok
-2. Get an interactive v100 with:
-  **a100**
-  `srun --gres=gpu:a100:1 --exclude=a100gpu2 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash`
-  `srun --gres=gpu:a100:1 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash`
-  `srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=01:00:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash`
-  `srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=01:30:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash`
-  `srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=02:00:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash`
 
-**v100**
-  `srun --gres=gpu:v100:1 --partition=gpu --time=01:00:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash`
-  `srun --gres=gpu:v100:1 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=32000 --pty /bin/bash`
+1. SSH into Habrok
+
+2. Get an interactive GPU with:
+
+### a100
+```bash
+srun --gres=gpu:a100:1 --exclude=a100gpu2 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash
+srun --gres=gpu:a100:1 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash
+srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=01:00:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash
+srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=01:30:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash
+srun --gres=gpu --exclude=a100gpu3 --partition=gpu --time=02:00:00 --cpus-per-task=12 --mem=64000 --pty /bin/bash
+```
+
+### v100
+```bash
+srun --gres=gpu:v100:1 --partition=gpu --time=01:00:00 --cpus-per-task=8 --mem=64000 --pty /bin/bash
+srun --gres=gpu:v100:1 --partition=gpu --time=00:30:00 --cpus-per-task=8 --mem=32000 --pty /bin/bash
+```
 
