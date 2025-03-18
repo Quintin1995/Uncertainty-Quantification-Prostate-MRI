@@ -28,12 +28,12 @@ source /home1/p290820/repos/direct-with-averages/env/bin/activate
 
 # PART DEBUG TEST
 direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/recons_gaussian_noise/debug \
-    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r3_remade.yaml \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r3_gaussian.yaml \
     --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
     --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
-    --filenames-filter /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lists/umcg_0001_0172_1_debug.lst \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/umcg_0001_0172_1_debug.lst \
     --num-gpus 1 \
-    --num-workers 8
+    --num-workers 0
 
 
 # # PART 1 - 15 patients
