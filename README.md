@@ -110,6 +110,8 @@ direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussi
     --num-gpus 1 \
     --num-workers 4
 
+
+# R=6
 # GAUSSIAN (R=6) - PART DEBUG TEST
 direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_6x \
     --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r6_gaussian.yaml \
