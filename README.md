@@ -1,8 +1,23 @@
+
 # Uncertainty Quantification for Prostate MRI
 
-This project performs uncertainty quantification for prostate MRI. Our goals are to:
-- **Adaptively Reconstruct:** Adjust reconstruction based on temporal uncertainty.
-- **Correlate Maps:** Compare error maps with uncertainty maps to improve diagnostic confidence.
+This repository demonstrates a noise-injection approach to generate uncertainty maps for prostate MRI reconstructions. By injecting coil-specific noise multiple times into k-space, reconstructing (e.g., with a deep learning vSHARP model), and computing the voxel-wise standard deviation, we highlight regions that are most sensitive to noise or prone to reconstruction artifacts.
+
+## Goals
+- **Adaptive Reconstruction:** Explore how repeated noise perturbations can guide more robust or confident reconstruction strategies.  
+- **Map Correlation:** Compare uncertainty maps (voxel-wise std) with error maps to validate whether high-uncertainty regions align with actual reconstruction errors or “hallucinations.”
+
+## Example Figures
+Below are two example uncertainty maps: one thresholded at the 95th percentile and one at the 99th percentile (top 1% of voxels with highest std).
+
+```markdown
+![Uncertainty Map (95%)](figures/example.png)
+
+**Explanation:**
+- The **noise injection** step ensures that each coil’s measured baseline noise is scaled and added to the k-space in multiple Monte Carlo runs.  
+- The **standard deviation** (STD) across these runs is computed to form the uncertainty map.  
+- **Thresholding** (e.g., 95% or 99%) highlights only the most uncertain voxels, which can help focus on critical regions for further analysis or clinical review.
+
 
 ---
 
@@ -16,6 +31,9 @@ This project performs uncertainty quantification for prostate MRI. Our goals are
 - **DIRECT with Averages**  
   Hosts the DIRECT repository for creating the reconstructions.  
   *Location:* `/home1/p290820/repos/direct-with-averages`
+
+### .gitignore Assets
+Databases have been excluded from the repo and are available upon request.
 
 ### Reconstructions Storage
 - **Reconstructions Directory**  
