@@ -1,4 +1,3 @@
-
 # Uncertainty Quantification for Prostate MRI
 
 This repository demonstrates a noise-injection approach to generate uncertainty maps for prostate MRI reconstructions. By injecting coil-specific noise multiple times into k-space, reconstructing (e.g., with a deep learning vSHARP model), and computing the voxel-wise standard deviation, we highlight regions that are most sensitive to noise or prone to reconstruction artifacts.
@@ -7,10 +6,9 @@ This repository demonstrates a noise-injection approach to generate uncertainty 
 - **Adaptive Reconstruction:** Explore how repeated noise perturbations can guide more robust or confident reconstruction strategies.  
 - **Map Correlation:** Compare uncertainty maps (voxel-wise std) with error maps to validate whether high-uncertainty regions align with actual reconstruction errors or “hallucinations.”
 
-## Example Figures
+## Example Figure
 Below are two example uncertainty maps: one thresholded at the 95th percentile and one at the 99th percentile (top 1% of voxels with highest std).
 
-```markdown
 ![Uncertainty Map (95%)](figures/example.png)
 
 **Explanation:**
