@@ -108,19 +108,34 @@ direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussi
     --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
     --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/split_by_20/umcg_0001_0172_1_t19.lst \
     --num-gpus 1 \
-    --num-workers 5
+    --num-workers 4
 
 
-# R=6
-# GAUSSIAN (R=6) - PART DEBUG TEST
+# R=6 - PAT 0-20 run1 - Gaussian
 direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_6x \
     --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r6_gaussian.yaml \
     --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
     --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
     --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/split_by_20/umcg_0001_0172_1_t19.lst \
     --num-gpus 1 \
-    --num-workers 5
-    
+    --num-workers 4
+# R=6 - PAT 0-20 run2 - Gaussian
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r6_gaussian.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/split_by_20/umcg_0001_0172_1_t19.lst \
+    --num-gpus 1 \
+    --num-workers 4
+# R=6 - PAT 0-20 run3 - Gaussian
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r6_gaussian.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/split_by_20/umcg_0001_0172_1_t19.lst \
+    --num-gpus 1 \
+    --num-workers 4
+
 
 # # PART 1 - 15 patients
 # direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/reconstructions/debug \
