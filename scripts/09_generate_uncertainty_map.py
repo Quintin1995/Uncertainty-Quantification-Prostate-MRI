@@ -13,18 +13,19 @@ LOGGER = setup_logger(Path('logs/'), use_time=False, part_fname='post_process_in
 
 
 def generate_uncertainty_map(
-        pat_root: Path        = None,
-        do_norm: bool         = False,
-        do_post_process: bool = True,
-        acceleration: int     = None,
-        save_nifti: bool      = False,
-        ref_nifti: sitk.Image = None,
-        kspace_root_dir: Path = None,
-        db_fpath_old: Path    = None,
-        do_round_uq_map: bool = False,
-        decimals: int         = 4,
-        uq_save_fpath: Path   = None, 
-        debug: bool           = False,
+        pat_root: Path            = None,
+        do_norm: bool             = False,
+        do_post_process: bool     = True,
+        do_round_sub_recons: bool = True,
+        acceleration: int         = None,
+        save_nifti: bool          = False,
+        ref_nifti: sitk.Image     = None,
+        kspace_root_dir: Path     = None,
+        db_fpath_old: Path        = None,
+        do_round_uq_map: bool     = False,
+        decimals: int             = 4,
+        uq_save_fpath: Path       = None, 
+        debug: bool               = False,
     ) -> None:
     """
     Load and process the reconstructions for a patient directory containing .h5 files.
@@ -79,6 +80,9 @@ def generate_uncertainty_map(
             # 3) Post-processing
             if do_post_process:
                 recon_np = post_process_3d_image(recon_np, zero_pad_shape, image_space_crop)
+            # 3.1) Rounding
+            if do_round_sub_recons: 
+                recon_np = np.round(recon_np, decimals)
             # 4) Save Nifti
             if save_nifti and ref_nifti is not None:
                 recon_sitk = sitk.GetImageFromArray(recon_np)
@@ -103,12 +107,11 @@ def generate_uncertainty_map(
         uq_map = np.round(uq_map, decimals)
 
     # 7) Save the uncertainty map as a Nifti file
-    save_path = pat_root / 'uq_map_gm25.nii.gz'
     uq_map_sitk = sitk.GetImageFromArray(uq_map)
     if ref_nifti is not None:
         uq_map_sitk.CopyInformation(ref_nifti)
-    sitk.WriteImage(uq_map_sitk, str(save_path))
-    print(f'Saved uncertainty map as {save_path}')
+    sitk.WriteImage(uq_map_sitk, str(uq_save_fpath))
+    print(f'Saved uncertainty map as {uq_save_fpath}')
 
     return None     # Goal is to save the uncertainty map as a Nifti file
 
@@ -120,6 +123,7 @@ def process_all_uncertainty_maps(
         acc_roots: Dict[int, Path]     = None,
         do_norm: bool                  = True,
         do_post_processing: bool       = True,
+        do_round_sub_recons: bool      = True,
         save_subr_as_nifti: bool       = True,
         kspace_root_dir: Path          = None,
         db_fpath_old: Path             = None,
@@ -155,28 +159,29 @@ def process_all_uncertainty_maps(
             # R=3 or R=6: load the single recon AND the stack of reconstructions
             actual_acc_recon = vsharp_reader_study_root / pat_id / f"{pat_id}_VSharp_R{acc}_recon_dcml.mha"
             
-            target_uq_fpathname = acc_roots[acc] / pat_id / f"uq_map_gm25.nii.gz"
+            target_uq_fpathname = acc_roots[acc] / pat_id / f"uq_map_R{acc}_gm25.nii.gz"
 
             # if this file already exists, we skip and print and continue
-
-            if target_uq_fpathname.exists():
-                print(f"Uncertainty map (R={acc}) already exists: {target_uq_fpathname}, skipping...")
-                continue
+            if False:
+                if target_uq_fpathname.exists():
+                    print(f"Uncertainty map (R={acc}) already exists: {target_uq_fpathname}, skipping...")
+                    continue
 
             # Create the np.stack4d (multiple reconstructions for uncertainty quantification)
             generate_uncertainty_map(
-                pat_root        = acc_roots[acc] / pat_id,
-                do_norm         = do_norm,
-                do_post_process = do_post_processing,
-                acceleration    = acc,
-                save_nifti      = save_subr_as_nifti,
-                ref_nifti       = sitk.ReadImage(str(actual_acc_recon)),   # optional reference SITK image
-                kspace_root_dir = kspace_root_dir,
-                db_fpath_old    = db_fpath_old,
-                do_round_uq_map = do_round_uq_map,
-                decimals        = decimals,
-                uq_save_fpath   = target_uq_fpathname,     
-                debug           = debug
+                pat_root            = acc_roots[acc] / pat_id,
+                do_norm             = do_norm,
+                do_post_process     = do_post_processing,
+                do_round_sub_recons = do_round_sub_recons,
+                acceleration        = acc,
+                save_nifti          = save_subr_as_nifti,
+                ref_nifti           = sitk.ReadImage(str(actual_acc_recon)),   # optional reference SITK image
+                kspace_root_dir     = kspace_root_dir,
+                db_fpath_old        = db_fpath_old,
+                do_round_uq_map     = do_round_uq_map,
+                decimals            = decimals,
+                uq_save_fpath       = target_uq_fpathname,     
+                debug               = debug
             )
 
 
@@ -199,21 +204,22 @@ if __name__ == "__main__":
     db_fpath_new = Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db') # References the LATEST version of the databases where the info could also just be fine that we are looking for
     
     # Parameters
-    debug              = True
-    do_round_uq_map    = True      # Round the uncertainty map to a certain number of decimals
-    acc_factors        = [3, 6] # Define the set of acceleration factors we care about.
-    do_norm            = True      # Normalize the reconstructions to [0, 1]
-    do_post_processing = True      # Post-processing, for each sub-reconstruction, such as k-space interpolation, flipping, and cropping
-    save_subr_as_nifti = True      # Save each sub-reconstructions as NIFTI files
-    decimals           = 4         # Number of decimals to round to
+    debug               = True
+    do_round_sub_recons = True      # Round the sub-reconstructions to a certain number of decimals
+    do_round_uq_map     = True      # Round the uncertainty map to a certain number of decimals
+    acc_factors         = [3, 6] # Define the set of acceleration factors we care about.
+    do_norm             = True      # Normalize the reconstructions to [0, 1]
+    do_post_processing  = True      # Post-processing, for each sub-reconstruction, such as k-space interpolation, flipping, and cropping
+    save_subr_as_nifti  = True      # Save each sub-reconstructions as NIFTI files
+    decimals            = 4         # Number of decimals to round to
 
     # All patient IDs to consider for Uncertainty Quantification
     pat_ids = [
-        '0003_ANON5046358',
+        # '0003_ANON5046358',
         # '0004_ANON9616598',
         # '0005_ANON8290811',
         # '0006_ANON2379607',
-        # '0007_ANON1586301',
+        '0007_ANON1586301',
         # '0008_ANON8890538',
         # '0010_ANON7748752',
         # '0011_ANON1102778',
@@ -338,6 +344,7 @@ if __name__ == "__main__":
         acc_roots                = acc_roots,
         do_norm                  = do_norm,
         do_post_processing       = do_post_processing,
+        do_round_sub_recons      = do_round_sub_recons,
         save_subr_as_nifti       = save_subr_as_nifti,
         kspace_root_dir          = kspace_root_dir,
         db_fpath_old             = db_fpath_old,
