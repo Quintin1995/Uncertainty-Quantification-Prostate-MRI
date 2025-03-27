@@ -19,8 +19,8 @@ def calculate_uncertainty_map(reconstructions: np.ndarray, debug=False) -> np.nd
     
     uq_map = reconstructions.std(axis=0)
     if debug: 
-        print(f"Shape of uncertainty map: {uq_map.shape}")
-        print(f"Min max of the uncertainty map (rounded): {np.round(uq_map.min(), 4)} - {np.round(uq_map.max(), 4)}")
+        print(f"\tShape of uncertainty map: {uq_map.shape}")
+        print(f"\tMin max of the uncertainty map (rounded): {np.round(uq_map.min(), 4)} - {np.round(uq_map.max(), 4)}")
     return uq_map
 
 

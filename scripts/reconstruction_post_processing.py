@@ -70,11 +70,11 @@ def zero_pad_in_sim_kspace(
         img_slice_padded     = np.fft.ifft2(kspace_slice_shift2)
         padded_image[i, ...] = np.abs(img_slice_padded)
 
-        print(f"\t\tSlice {i+1}/{n_slices} done.")
-        print(f"\t\t\tShape of the kspace_slice: {kspace_slice.shape}, with dtype {kspace_slice.dtype}")
-        print(f"\t\t\tShape of the kspace_slice_padded: {kspace_slice_padded.shape}, with dtype {kspace_slice_padded.dtype}")
-        print(f"\t\t\tShape of the img_slice_padded: {img_slice_padded.shape}, with dtype {img_slice_padded.dtype}")
-        print(f"\t\t\tShape of the padded_image: {padded_image.shape}, with dtype {padded_image.dtype}")
+        # print(f"\t\tSlice {i+1}/{n_slices} done.")
+        # print(f"\t\t\tShape of the kspace_slice: {kspace_slice.shape}, with dtype {kspace_slice.dtype}")
+        # print(f"\t\t\tShape of the kspace_slice_padded: {kspace_slice_padded.shape}, with dtype {kspace_slice_padded.dtype}")
+        # print(f"\t\t\tShape of the img_slice_padded: {img_slice_padded.shape}, with dtype {img_slice_padded.dtype}")
+        # print(f"\t\t\tShape of the padded_image: {padded_image.shape}, with dtype {padded_image.dtype}")
 
     return padded_image
 
@@ -135,7 +135,7 @@ def norm_rescale01(recon: np.ndarray, debug: bool = False) -> np.ndarray:
     assert isinstance(recon, np.ndarray), "recon must be a NumPy array."
 
     if debug:
-        print(f"Applying normalization rescale01 to reconstructions with shape: {recon.shape}")
+        print(f"\tApplying normalization rescale01 to reconstructions with shape: {recon.shape}")
 
     # Add a small epsilon to avoid division by zero.
     return (recon - recon.min()) / (recon.max() - recon.min() + 1e-8)
