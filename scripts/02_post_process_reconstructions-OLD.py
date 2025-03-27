@@ -752,8 +752,8 @@ def postprocess_all_patients(
             # add_vis_qual_metrics_to_h5(hf=hf_pred, recon=recon, target=target, logger=logger)
             
             if do_make_dicom_like:
-                recon_dicom_like  = make_dicom_like(dicom_dir, recon, verbose = True, logger=logger) if not target_only else None
-                target_dicom_like = make_dicom_like(dicom_dir, target, verbose = True, logger=logger)
+                recon_dicom_like  = make_dicom_like(dicom_dir, recon, verbose=True, logger=logger) if not target_only else None
+                target_dicom_like = make_dicom_like(dicom_dir, target, verbose=True, logger=logger)
                 reference_sitk = sitk.ReadImage(t2_tra_nif_fpath)
                 if not target_only:
                     safe_as_sitk(
