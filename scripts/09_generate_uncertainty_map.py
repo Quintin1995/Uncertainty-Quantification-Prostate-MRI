@@ -9,7 +9,8 @@ from dicom_utils import get_shapes_from_dicom, find_respective_dicom_dir
 from utils import setup_logger
 from reconstruction_post_processing import norm_rescale01, post_process_3d_image
 from uncertainty_quantification import calculate_uncertainty_map
-LOGGER = setup_logger(Path('logs/'), use_time=False, part_fname='post_process_inference')
+
+LOGGER = setup_logger(Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/logs/'), use_time=False, part_fname='post_process_inference')
 
 
 def generate_uncertainty_map(
@@ -57,6 +58,8 @@ def generate_uncertainty_map(
     assert isinstance(decimals, int), "decimals must be an integer."
     assert isinstance(kspace_root_dir, Path), "kspace_root_dir must be a Path."
     assert isinstance(db_fpath_old, Path), "db_fpath_old must be a Path."
+    assert pat_root.is_dir(), f"pat_root must be a directory, got: {pat_root}"
+    assert pat_root.exists(), f"pat_root does not exist: {pat_root}"
     assert pat_root.is_dir(), f"pat_root must be a directory, got: {pat_root}"
 
 
@@ -162,10 +165,9 @@ def process_all_uncertainty_maps(
             target_uq_fpathname = acc_roots[acc] / pat_id / f"uq_map_R{acc}_gm25.nii.gz"
 
             # if this file already exists, we skip and print and continue
-            if False:
-                if target_uq_fpathname.exists():
-                    print(f"Uncertainty map (R={acc}) already exists: {target_uq_fpathname}, skipping...")
-                    continue
+            if target_uq_fpathname.exists():
+                print(f"Uncertainty map (R={acc}) already exists: {target_uq_fpathname}, skipping...")
+                continue
 
             # Create the np.stack4d (multiple reconstructions for uncertainty quantification)
             generate_uncertainty_map(
@@ -215,10 +217,10 @@ if __name__ == "__main__":
 
     # All patient IDs to consider for Uncertainty Quantification
     pat_ids = [
-        # '0003_ANON5046358',
-        # '0004_ANON9616598',
-        # '0005_ANON8290811',
-        # '0006_ANON2379607',
+        '0003_ANON5046358',
+        '0004_ANON9616598',
+        '0005_ANON8290811',
+        '0006_ANON2379607',
         '0007_ANON1586301',
         # '0008_ANON8890538',
         # '0010_ANON7748752',

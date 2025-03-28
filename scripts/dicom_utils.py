@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Tuple
 from pydicom import dcmread
 from sqlite3 import connect
+import SimpleITK as sitk
 
 
 def get_shapes_from_dicom(dicom_dir: Path) -> Tuple:
@@ -105,3 +106,26 @@ def find_respective_dicom_dir(pat_id: str, source_dir: Path = None, db_fpath: Pa
             raise Exception(f"No MRI date found for patient ID {pat_id}")
     finally:
         conn.close()
+
+
+def resample_to_reference(
+    image: sitk.Image, 
+    ref_img: sitk.Image, 
+    interpolator = sitk.sitkNearestNeighbor, 
+    default_pixel_value: float = 0
+) -> sitk.Image:
+    """
+    Automatically aligns, resamples, and crops an SITK image to a
+    reference image. Can be either from .mha or .nii.gz files.
+
+    Parameters:
+    `image`: The moving image to align
+    `ref_img`: The reference image with desired spacing, crop size, etc.
+    `interpolator`: SITK interpolator for resampling
+    `default_pixel_value`: Pixel value for voxels outside of original image
+    """
+    resampled_img = sitk.Resample(image, ref_img, 
+            sitk.Transform(), 
+            interpolator, default_pixel_value, 
+            ref_img.GetPixelID())
+    return resampled_img
