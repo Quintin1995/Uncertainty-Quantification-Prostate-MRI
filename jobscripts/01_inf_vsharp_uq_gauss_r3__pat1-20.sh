@@ -23,7 +23,7 @@ module load NCCL/2.12.12-GCCcore-11.3.0-CUDA-11.7.0
 
 source /home1/p290820/repos/direct-with-averages/env/bin/activate
 
-# R=6
+# R3
 direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_3x \
     --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r3_gaussian.yaml \
     --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \

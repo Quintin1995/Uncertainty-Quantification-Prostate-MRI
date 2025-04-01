@@ -1,0 +1,275 @@
+import SimpleITK as sitk
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import List, Tuple, Dict, Any, Union
+
+from pathlib import Path
+
+from dicom_utils import resample_to_reference
+from uncertainty_quantification import apply_percentile_threshold
+
+
+
+
+# DOCUMENTATION
+# we make a couple of table in an existing database
+# 1. Summary Statistics to Store (Per Region & Acceleration)
+# For both Uncertainty and Absolute Error, and per region (lesion & prostate):
+
+# Metric	Use case
+# mean	Average intensity — simple global indicator
+# median	Robust to outliers
+# max	Outlier/hallucination indicator
+# std	Variation in signal (texture proxy)
+# volume	Total #voxels in mask
+# hotspot_volume_95p	#voxels > 95th percentile (global or per-patient)
+# mean_above_95p	Mean of values in hotspot — severity of high-error/UQ areas
+# percent_above_95p	% of mask occupied by hotspot
+# Additionally for correlation analysis:
+
+# pearson_corr between UQ and ABS (per-voxel inside lesion/prostate).
+
+# spearman_corr if distributions are not normal.
+
+# We do not store the whole images, just these features.
+
+def get_combined_rois_array(pat_root: Path, r1_ref_image: sitk.Image, r1_arr: np.ndarray) -> Tuple[np.ndarray, List[int]]:
+    roi_fpaths = list(pat_root.glob("*_roi_*.mha"))
+    roi_arrs_combined = np.zeros_like(r1_arr)
+    for roi_fpath in roi_fpaths:
+        roi_img = sitk.ReadImage(str(roi_fpath))
+        roi_img_resampled = resample_to_reference(roi_img, r1_ref_image)
+        roi_arr = sitk.GetArrayFromImage(roi_img_resampled)
+        roi_arrs_combined += roi_arr
+        slice_idxs_lesion = [i for i in range(len(roi_arrs_combined)) if np.sum(roi_arrs_combined[i]) > 0]
+        print(f"ROI {roi_fpath.name} has {len(slice_idxs_lesion)} slices with lesions. With idxs: {slice_idxs_lesion}")
+    return roi_arrs_combined, slice_idxs_lesion
+
+
+def extract_and_store_correlation_uq_vs_abs(
+    pat_id: str,
+    slice_idx: int,
+    perc_thr: int,
+    roots: Dict[Union[int, str], Path],
+    decimals: int = 2,
+):
+    # R1 and lesion
+    pat_root          = roots['reader_study'] / pat_id
+    r1_img            = sitk.ReadImage(str(pat_root / f"{pat_id}_rss_target_dcml.mha"))
+    r1_arr            = sitk.GetArrayFromImage(r1_img)
+    roi_arr, les_idxs = get_combined_rois_array(pat_root, r1_img, r1_arr)
+    r1_empty_arr      = np.zeros_like(r1_arr)
+    print(f"\n\tr1_arr stats: max={np.max(r1_arr)}, min={np.min(r1_arr)}, mean={np.mean(r1_arr)}, median={np.median(r1_arr)}, std={np.std(r1_arr)}, shape={r1_arr.shape}")
+
+    # Get the prostate segmentation
+    prostate_seg_root = roots['reader_study_segs'] / f"{pat_id}_mlseg_total_mr.nii.gz"
+    prost_seg_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(prostate_seg_root))) # so this is a segmentation of many multi-label anatomical structures, where are interested in where it is the prostate=17
+    prost_seg_arr     = np.where(prost_seg_arr == 17, 1, 0) # this is the prostate segmentation
+    print(f"\tProstate segmentation stats: max={np.max(prost_seg_arr)}, min={np.min(prost_seg_arr)}, mean={np.mean(prost_seg_arr)}, median={np.median(prost_seg_arr)}, std={np.std(prost_seg_arr)}, shape={prost_seg_arr.shape}")
+
+    # Load R3 Reconstruction --> compute Absolute Error and Load UQ map
+    r3_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R3_recon_dcml.mha")))
+    print(f"\tR3 reconstruction stats: max={np.max(r3_arr)}, min={np.min(r3_arr)}, mean={np.mean(r3_arr)}, median={np.median(r3_arr)}, std={np.std(r3_arr)}, shape={r3_arr.shape}")
+    r3_abs_error_arr  = np.abs(r1_arr - r3_arr)
+    print(f"\tR3 Absolute Error stats: max={np.max(r3_abs_error_arr)}, min={np.min(r3_abs_error_arr)}, mean={np.mean(r3_abs_error_arr)}, median={np.median(r3_abs_error_arr)}, std={np.std(r3_abs_error_arr)}, shape={r3_abs_error_arr.shape}")
+    r3_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots['R3'] / pat_id / f"uq_map_R3_gm25.nii.gz")))
+    print(f"\tR3 UQ map stats: max={np.max(r3_uq_map_arr)}, min={np.min(r3_uq_map_arr)}, mean={np.mean(r3_uq_map_arr)}, median={np.median(r3_uq_map_arr)}, std={np.std(r3_uq_map_arr)}, shape={r3_uq_map_arr.shape}")
+    r3_uq_thr         = apply_percentile_threshold(r3_uq_map_arr, percentile=perc_thr, debug=False)
+
+    # Load R6 Reconstruction --> compute Absolute Error and Load UQ map
+    r6_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R6_recon_dcml.mha")))
+    print(f"\tR6 reconstruction stats: max={np.max(r6_arr)}, min={np.min(r6_arr)}, mean={np.mean(r6_arr)}, median={np.median(r6_arr)}, std={np.std(r6_arr)}, shape={r6_arr.shape}")
+    r6_abs_error_arr  = np.abs(r1_arr - r6_arr)
+    print(f"\tR6 Absolute Error stats: max={np.max(r6_abs_error_arr)}, min={np.min(r6_abs_error_arr)}, mean={np.mean(r6_abs_error_arr)}, median={np.median(r6_abs_error_arr)}, std={np.std(r6_abs_error_arr)}, shape={r6_abs_error_arr.shape}")
+    r6_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots["R6"] / pat_id / f"uq_map_R6_gm25.nii.gz")))
+    print(f"\tR6 UQ map stats: max={np.max(r6_uq_map_arr)}, min={np.min(r6_uq_map_arr)}, mean={np.mean(r6_uq_map_arr)}, median={np.median(r6_uq_map_arr)}, std={np.std(r6_uq_map_arr)}, shape={r6_uq_map_arr.shape}")
+    r6_uq_thr         = apply_percentile_threshold(r6_uq_map_arr, percentile=perc_thr, debug=False)
+
+    # If there are no lesions, use the slice index provided
+    slice_idx = slice_idx if len(les_idxs) == 0 else les_idxs[0]
+    print(f"Using slice index {slice_idx} for patient {pat_id}")
+
+    # for the abs_error and uq maps, we compute within the proste_segmentation where the value ==1 what the mean, max and median is and pearson_corr
+    for i in range(r1_arr.shape[0]):
+        mask = prost_seg_arr[i] == 1
+        if not np.any(mask):
+            continue  # skip slices with no prostate
+        
+        # Extract values within mask
+        abs_vals_r3 = r3_abs_error_arr[i][mask]
+        uq_vals_r3  = r3_uq_thr[i][mask]
+
+        # Compute stats
+        stats = {
+            "mean_abs_r3":   np.mean(abs_vals_r3),
+            "median_abs_r3": np.median(abs_vals_r3),
+            "max_abs_r3":    np.max(abs_vals_r3),
+            "std_abs_r3":    np.std(abs_vals_r3),
+            "mean_uq_r3":    np.mean(uq_vals_r3),
+            "median_uq_r3":  np.median(uq_vals_r3),
+            "max_uq_r3":     np.max(uq_vals_r3),
+            "std_uq_r3":     np.std(uq_vals_r3),
+        }
+
+        print(f"Slice {i} stats (R3):")
+        for k, v in stats.items():
+            print(f"  {k}: {v:.{decimals}f}")
+
+
+
+if __name__ == '__main__':
+    vsharp_reader_study_root = Path('/scratch/hb-pca-rad/projects/03_reader_set_v2')
+
+    # All patient IDs to consider for Uncertainty Quantification
+    pat_ids = [
+        # '0003_ANON5046358',
+        # '0004_ANON9616598',
+        # '0005_ANON8290811',
+        # '0006_ANON2379607',
+        '0007_ANON1586301',
+        # '0008_ANON8890538',
+        # '0010_ANON7748752',
+        # '0011_ANON1102778',
+        # '0012_ANON4982869',
+        # '0013_ANON7362087',
+        # '0014_ANON3951049',
+        # '0015_ANON9844606',
+        # '0018_ANON9843837',
+        # '0019_ANON7657657',
+        # '0020_ANON1562419',
+        # '0021_ANON4277586',
+        # '0023_ANON6964611',
+        # '0024_ANON7992094',
+        # '0026_ANON3620419',
+        # '0027_ANON9724912',
+        # '0028_ANON3394777',
+        # '0029_ANON7189994',
+        # '0030_ANON3397001',
+        # '0031_ANON9141039',
+        # '0032_ANON7649583',
+        # '0033_ANON9728185',
+        # '0035_ANON3474225',
+        # '0036_ANON0282755',
+        # '0037_ANON0369080',
+        # '0039_ANON0604912',
+        # '0042_ANON9423619',
+        # '0043_ANON7041133',
+        # '0044_ANON8232550',
+        # '0045_ANON2563804',
+        # '0047_ANON3613611',
+        # '0048_ANON6365688',
+        # '0049_ANON9783006',
+        # '0051_ANON1327674',
+        # '0052_ANON9710044',
+        # '0053_ANON5517301',
+        # '0055_ANON3357872',
+        # '0056_ANON2124757',
+        # '0057_ANON1070291',
+        # '0058_ANON9719981',
+        # '0059_ANON7955208',
+        # '0061_ANON7642254',
+        # '0062_ANON0319974',
+        # '0063_ANON9972960',
+        # '0064_ANON0282398',
+        # '0067_ANON0913099',
+        # '0068_ANON7978458',
+        # '0069_ANON9840567',
+        # '0070_ANON5223499',
+        # '0071_ANON9806291',
+        # '0073_ANON5954143',
+        # '0075_ANON5895496',
+        # '0076_ANON3983890',
+        # '0077_ANON8634437',
+        # '0078_ANON6883869',
+        # '0079_ANON8828023',
+        # '0080_ANON4499321',
+        # '0081_ANON9763928',
+        # '0082_ANON6073234',
+        # '0083_ANON9898497',
+        # '0084_ANON6141178',
+        # '0085_ANON4535412',
+        # '0086_ANON8511628',
+        # '0087_ANON9534873',
+        # '0088_ANON9892116',
+        # '0089_ANON9786899',
+        # '0090_ANON0891692',
+        # '0092_ANON9941969',
+        # '0093_ANON9728761',
+        # '0094_ANON8024204',
+        # '0095_ANON4189062',
+        # '0097_ANON5642073',
+        # '0103_ANON8583296',
+        # '0104_ANON7748630',
+        # '0105_ANON9883201',
+        # '0107_ANON4035085',
+        # '0108_ANON0424679',
+        # '0109_ANON9816976',
+        # '0110_ANON8266491',
+        # '0111_ANON9310466',
+        # '0112_ANON3210850',
+        # '0113_ANON9665113',
+        # '0115_ANON0400743',
+        # '0116_ANON9223478',
+        # '0118_ANON7141024',
+        # '0119_ANON3865800',
+        # '0120_ANON7275574',
+        # '0121_ANON9629161',
+        # '0123_ANON7265874',
+        # '0124_ANON8610762',
+        # '0125_ANON0272089',
+        # '0126_ANON4747182',
+        # '0127_ANON8023509',
+        # '0128_ANON8627051',
+        # '0129_ANON5344332',
+        # '0135_ANON9879440',
+        # '0136_ANON8096961',
+        # '0137_ANON8035619',
+        # '0138_ANON1747790',
+        # '0139_ANON2666319',
+        # '0140_ANON0899488',
+        # '0141_ANON8018038',
+        # '0142_ANON7090827',
+        # '0143_ANON9752849',
+        # '0144_ANON2255419',
+        # '0145_ANON0335209',
+        # '0146_ANON7414571',
+        # '0148_ANON9604223',
+        # '0149_ANON4712664',
+        # '0150_ANON5824292',
+        # '0152_ANON2411221',
+        # '0153_ANON5958718',
+        # '0155_ANON7828652',
+        # '0157_ANON9873056',
+        # '0159_ANON9720717',
+        # '0160_ANON3504149'
+    ]
+
+    # vSHARP Reconstruction Root Directories
+    roots = {
+        'reader_study': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
+        'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
+        'R3': Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{3}x"),
+        'R6': Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{6}x")
+    }
+
+    # Location where the .h5 kspace files are stored for each patient
+    kspace_root_dir = Path('/scratch/p290820/datasets/003_umcg_pst_ksps')      # source_dir
+
+    # Databases 
+    db_fpath_old = Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db')               # References an OLDER version of the databases where the info could also just be fine that we are looking for
+    db_fpath_new = Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db') # References the LATEST version of the databases where the info could also just be fine that we are looking for
+
+    # Parameters
+    debug                = True
+    do_adaptive_clipping = True
+    acc_factors          = [3, 6] # Define the set of acceleration factors we care about.
+    decimals             = 4      # Number of decimals to round to
+
+    for pat_id in pat_ids:
+        extract_and_store_correlation_uq_vs_abs(
+            pat_id    = '0007_ANON1586301',
+            slice_idx = 10,
+            perc_thr  = 95,
+            roots     = roots,
+            decimals  = 2
+        )
