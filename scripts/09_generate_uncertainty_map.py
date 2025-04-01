@@ -152,7 +152,6 @@ def process_all_uncertainty_maps(
     Returns:
         None
     """
-    
     print(f"Processing all patients for uncertainty maps... len(pat_ids): {len(pat_ids)}, for acc_factors: {acc_factors}")
 
     for pat_id in pat_ids:
