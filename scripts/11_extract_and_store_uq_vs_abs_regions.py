@@ -9,8 +9,6 @@ from dicom_utils import resample_to_reference
 from uncertainty_quantification import apply_percentile_threshold
 
 
-
-
 # DOCUMENTATION
 # we make a couple of table in an existing database
 # 1. Summary Statistics to Store (Per Region & Acceleration)
@@ -41,40 +39,38 @@ def get_combined_rois_array(pat_root: Path, r1_ref_image: sitk.Image, r1_arr: np
         roi_img_resampled = resample_to_reference(roi_img, r1_ref_image)
         roi_arr = sitk.GetArrayFromImage(roi_img_resampled)
         roi_arrs_combined += roi_arr
-        slice_idxs_lesion = [i for i in range(len(roi_arrs_combined)) if np.sum(roi_arrs_combined[i]) > 0]
-        print(f"ROI {roi_fpath.name} has {len(slice_idxs_lesion)} slices with lesions. With idxs: {slice_idxs_lesion}")
+    slice_idxs_lesion = [i for i in range(len(roi_arrs_combined)) if np.sum(roi_arrs_combined[i]) > 0]
+    print(f"\tCombined ROI {roi_fpath.name} has {len(slice_idxs_lesion)} slices with lesions. With idxs: {slice_idxs_lesion}")
     return roi_arrs_combined, slice_idxs_lesion
 
 
 def extract_and_store_correlation_uq_vs_abs(
     pat_id: str,
-    slice_idx: int,
-    perc_thr: int,
     roots: Dict[Union[int, str], Path],
+    acc_factors: List[int],
     decimals: int = 2,
+    debug: bool = False,
 ):
-    # R1 and lesion
+    # Load R1 and Load lesion
     pat_root          = roots['reader_study'] / pat_id
     r1_img            = sitk.ReadImage(str(pat_root / f"{pat_id}_rss_target_dcml.mha"))
     r1_arr            = sitk.GetArrayFromImage(r1_img)
     roi_arr, les_idxs = get_combined_rois_array(pat_root, r1_img, r1_arr)
-    r1_empty_arr      = np.zeros_like(r1_arr)
-    print(f"\n\tr1_arr stats: max={np.max(r1_arr)}, min={np.min(r1_arr)}, mean={np.mean(r1_arr)}, median={np.median(r1_arr)}, std={np.std(r1_arr)}, shape={r1_arr.shape}")
+    print(f"\tr1_arr stats: max={np.max(r1_arr)}, min={np.min(r1_arr)}, mean={np.mean(r1_arr)}, median={np.median(r1_arr)}, std={np.std(r1_arr)}, shape={r1_arr.shape}")
 
-    # Get the prostate segmentation
+    # Load prostate segmentation
     prostate_seg_root = roots['reader_study_segs'] / f"{pat_id}_mlseg_total_mr.nii.gz"
     prost_seg_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(prostate_seg_root))) # so this is a segmentation of many multi-label anatomical structures, where are interested in where it is the prostate=17
     prost_seg_arr     = np.where(prost_seg_arr == 17, 1, 0) # this is the prostate segmentation
-    print(f"\tProstate segmentation stats: max={np.max(prost_seg_arr)}, min={np.min(prost_seg_arr)}, mean={np.mean(prost_seg_arr)}, median={np.median(prost_seg_arr)}, std={np.std(prost_seg_arr)}, shape={prost_seg_arr.shape}")
+    print(f"\tProstate segmentation stats: max={np.max(prost_seg_arr)}, min={np.min(prost_seg_arr)} std={np.std(prost_seg_arr)}, shape={prost_seg_arr.shape}")
 
-    # Load R3 Reconstruction --> compute Absolute Error and Load UQ map
+    # Load R3 vSHARP Reconstruction --> compute Absolute Error and Load UQ map
     r3_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R3_recon_dcml.mha")))
     print(f"\tR3 reconstruction stats: max={np.max(r3_arr)}, min={np.min(r3_arr)}, mean={np.mean(r3_arr)}, median={np.median(r3_arr)}, std={np.std(r3_arr)}, shape={r3_arr.shape}")
     r3_abs_error_arr  = np.abs(r1_arr - r3_arr)
     print(f"\tR3 Absolute Error stats: max={np.max(r3_abs_error_arr)}, min={np.min(r3_abs_error_arr)}, mean={np.mean(r3_abs_error_arr)}, median={np.median(r3_abs_error_arr)}, std={np.std(r3_abs_error_arr)}, shape={r3_abs_error_arr.shape}")
     r3_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots['R3'] / pat_id / f"uq_map_R3_gm25.nii.gz")))
     print(f"\tR3 UQ map stats: max={np.max(r3_uq_map_arr)}, min={np.min(r3_uq_map_arr)}, mean={np.mean(r3_uq_map_arr)}, median={np.median(r3_uq_map_arr)}, std={np.std(r3_uq_map_arr)}, shape={r3_uq_map_arr.shape}")
-    r3_uq_thr         = apply_percentile_threshold(r3_uq_map_arr, percentile=perc_thr, debug=False)
 
     # Load R6 Reconstruction --> compute Absolute Error and Load UQ map
     r6_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R6_recon_dcml.mha")))
@@ -83,42 +79,98 @@ def extract_and_store_correlation_uq_vs_abs(
     print(f"\tR6 Absolute Error stats: max={np.max(r6_abs_error_arr)}, min={np.min(r6_abs_error_arr)}, mean={np.mean(r6_abs_error_arr)}, median={np.median(r6_abs_error_arr)}, std={np.std(r6_abs_error_arr)}, shape={r6_abs_error_arr.shape}")
     r6_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots["R6"] / pat_id / f"uq_map_R6_gm25.nii.gz")))
     print(f"\tR6 UQ map stats: max={np.max(r6_uq_map_arr)}, min={np.min(r6_uq_map_arr)}, mean={np.mean(r6_uq_map_arr)}, median={np.median(r6_uq_map_arr)}, std={np.std(r6_uq_map_arr)}, shape={r6_uq_map_arr.shape}")
-    r6_uq_thr         = apply_percentile_threshold(r6_uq_map_arr, percentile=perc_thr, debug=False)
 
-    # If there are no lesions, use the slice index provided
-    slice_idx = slice_idx if len(les_idxs) == 0 else les_idxs[0]
-    print(f"Using slice index {slice_idx} for patient {pat_id}")
+    all_slice_stats = []
+    for acc in acc_factors:
+        abs_arr = r3_abs_error_arr if acc == 3 else r6_abs_error_arr
+        uq_arr  = r3_uq_map_arr    if acc == 3 else r6_uq_map_arr
+        for i in range(r1_arr.shape[0]):
+            slice_stat = {
+                "pat_id": pat_id,
+                "slice_idx": i,
+                "acc_factor": acc,
+            }
+            # ----- Whole Slice Stats -----
+            slice_stat.update({
+                "mean_abs_slice":   np.mean(abs_arr[i]),
+                "median_abs_slice": np.median(abs_arr[i]),
+                "max_abs_slice":    np.max(abs_arr[i]),
+                "std_abs_slice":    np.std(abs_arr[i]),
+                "mean_uq_slice":    np.mean(uq_arr[i]),
+                "median_uq_slice":  np.median(uq_arr[i]),
+                "max_uq_slice":     np.max(uq_arr[i]),
+                "std_uq_slice":     np.std(uq_arr[i]),
+            })
 
-    # for the abs_error and uq maps, we compute within the proste_segmentation where the value ==1 what the mean, max and median is and pearson_corr
-    for i in range(r1_arr.shape[0]):
-        mask = prost_seg_arr[i] == 1
-        if not np.any(mask):
-            continue  # skip slices with no prostate
-        
-        # Extract values within mask
-        abs_vals_r3 = r3_abs_error_arr[i][mask]
-        uq_vals_r3  = r3_uq_thr[i][mask]
+            # ----- Prostate stats -----
+            prostate_mask = prost_seg_arr[i] == 1
+            if np.any(prostate_mask):
+                abs_vals = abs_arr[i][prostate_mask]
+                uq_vals  = uq_arr[i][prostate_mask]
+                slice_stat.update({
+                    "mean_abs_prostate":   np.mean(abs_vals),
+                    "median_abs_prostate": np.median(abs_vals),
+                    "max_abs_prostate":    np.max(abs_vals),
+                    "std_abs_prostate":    np.std(abs_vals),
+                    "mean_uq_prostate":    np.mean(uq_vals),
+                    "median_uq_prostate":  np.median(uq_vals),
+                    "max_uq_prostate":     np.max(uq_vals),
+                    "std_uq_prostate":     np.std(uq_vals),
+                })
+            else:
+                slice_stat.update({
+                    "mean_abs_prostate": None,
+                    "median_abs_prostate": None,
+                    "max_abs_prostate": None,
+                    "std_abs_prostate": None,
+                    "mean_uq_prostate": None,
+                    "median_uq_prostate": None,
+                    "max_uq_prostate": None,
+                    "std_uq_prostate": None,
+                })
 
-        # Compute stats
-        stats = {
-            "mean_abs_r3":   np.mean(abs_vals_r3),
-            "median_abs_r3": np.median(abs_vals_r3),
-            "max_abs_r3":    np.max(abs_vals_r3),
-            "std_abs_r3":    np.std(abs_vals_r3),
-            "mean_uq_r3":    np.mean(uq_vals_r3),
-            "median_uq_r3":  np.median(uq_vals_r3),
-            "max_uq_r3":     np.max(uq_vals_r3),
-            "std_uq_r3":     np.std(uq_vals_r3),
-        }
+            # ----- Lesion stats -----
+            lesion_mask = roi_arr[i] > 0
+            if np.any(lesion_mask):
+                abs_vals = abs_arr[i][lesion_mask]
+                uq_vals  = uq_arr[i][lesion_mask]
 
-        print(f"Slice {i} stats (R3):")
-        for k, v in stats.items():
-            print(f"  {k}: {v:.{decimals}f}")
+                slice_stat.update({
+                    "mean_abs_lesion":   np.mean(abs_vals),
+                    "median_abs_lesion": np.median(abs_vals),
+                    "max_abs_lesion":    np.max(abs_vals),
+                    "std_abs_lesion":    np.std(abs_vals),
+                    "mean_uq_lesion":    np.mean(uq_vals),
+                    "median_uq_lesion":  np.median(uq_vals),
+                    "max_uq_lesion":     np.max(uq_vals),
+                    "std_uq_lesion":     np.std(uq_vals),
+                })
+            else:
+                slice_stat.update({
+                    "mean_abs_lesion": None,
+                    "median_abs_lesion": None,
+                    "max_abs_lesion": None,
+                    "std_abs_lesion": None,
+                    "mean_uq_lesion": None,
+                    "median_uq_lesion": None,
+                    "max_uq_lesion": None,
+                    "std_uq_lesion": None,
+                })
+
+            all_slice_stats.append(slice_stat)
+
+    if debug:
+        print(f"\n🔎 {len(all_slice_stats)} slice-level rows collected for patient {pat_id}")
+        for row in all_slice_stats:  # print first few
+            print(f"  ➤ Slice {row['slice_idx']} @ R={row['acc_factor']}: "
+                f"UQ_lesion_mean={row['mean_uq_lesion']}, ABS_prost_max={row['max_abs_prostate']}, Whole Slice mean UQ={row['mean_uq_slice']}")
+
+    return all_slice_stats
+
 
 
 
 if __name__ == '__main__':
-    vsharp_reader_study_root = Path('/scratch/hb-pca-rad/projects/03_reader_set_v2')
 
     # All patient IDs to consider for Uncertainty Quantification
     pat_ids = [
@@ -244,32 +296,27 @@ if __name__ == '__main__':
         # '0160_ANON3504149'
     ]
 
-    # vSHARP Reconstruction Root Directories
     roots = {
-        'reader_study': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
+        'reader_study':      Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
         'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
-        'R3': Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{3}x"),
-        'R6': Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{6}x")
+        'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{3}x"),
+        'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{6}x"),
+        'kspace_root':       Path('/scratch/p290820/datasets/003_umcg_pst_ksps'),
+        'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
+        'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
     }
+    debug         = True
+    do_adapt_clip = True
+    acc_factors   = [3, 6] # Define the set of acceleration factors we care about.
+    decimals      = 4      # Number of decimals to round to
 
-    # Location where the .h5 kspace files are stored for each patient
-    kspace_root_dir = Path('/scratch/p290820/datasets/003_umcg_pst_ksps')      # source_dir
-
-    # Databases 
-    db_fpath_old = Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db')               # References an OLDER version of the databases where the info could also just be fine that we are looking for
-    db_fpath_new = Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db') # References the LATEST version of the databases where the info could also just be fine that we are looking for
-
-    # Parameters
-    debug                = True
-    do_adaptive_clipping = True
-    acc_factors          = [3, 6] # Define the set of acceleration factors we care about.
-    decimals             = 4      # Number of decimals to round to
-
-    for pat_id in pat_ids:
+    for idx, pat_id in enumerate(pat_ids):
+        # progression print
+        print(f"\n{idx}/{len(pat_ids)} Extracting and storing correlation for patient {pat_id}...")
         extract_and_store_correlation_uq_vs_abs(
-            pat_id    = '0007_ANON1586301',
-            slice_idx = 10,
-            perc_thr  = 95,
-            roots     = roots,
-            decimals  = 2
+            pat_id      = pat_id,
+            roots       = roots,
+            acc_factors = acc_factors,
+            decimals    = decimals,
+            debug       = debug,
         )
