@@ -1,9 +1,11 @@
 import SimpleITK as sitk
 import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Tuple, Dict, Any, Union
+import sqlite3
+import pandas as pd
 
 from pathlib import Path
+from typing import List, Tuple, Dict, Any, Union
+from scipy.stats import spearmanr
 
 from dicom_utils import resample_to_reference
 from uncertainty_quantification import apply_percentile_threshold
@@ -44,13 +46,57 @@ def get_combined_rois_array(pat_root: Path, r1_ref_image: sitk.Image, r1_arr: np
     return roi_arrs_combined, slice_idxs_lesion
 
 
-def extract_and_store_correlation_uq_vs_abs(
+def compute_region_stats(abs_vals: np.ndarray, uq_vals: np.ndarray, prefix: str) -> Dict[str, Any]:
+    stats = {
+        # Absolute Error map
+        f"mean_abs_{prefix}": np.mean(abs_vals),
+        f"median_abs_{prefix}": np.median(abs_vals),
+        f"min_abs_{prefix}": np.min(abs_vals),
+        f"max_abs_{prefix}": np.max(abs_vals),
+        f"std_abs_{prefix}": np.std(abs_vals),
+        # Uncertainty map
+        f"mean_uq_{prefix}": np.mean(uq_vals),
+        f"median_uq_{prefix}": np.median(uq_vals),
+        f"min_uq_{prefix}": np.min(uq_vals),
+        f"max_uq_{prefix}": np.max(uq_vals),
+        f"std_uq_{prefix}": np.std(uq_vals),
+    }
+    if abs_vals.size > 1 and uq_vals.size > 1:
+        stats[f"pearson_corr_{prefix}"] = np.corrcoef(abs_vals, uq_vals)[0, 1]
+        stats[f"spearman_corr_{prefix}"] = spearmanr(abs_vals, uq_vals).correlation
+    else:
+        stats[f"pearson_corr_{prefix}"] = None
+        stats[f"spearman_corr_{prefix}"] = None
+    return stats
+
+
+def empty_region_stats(prefix: str) -> Dict[str, Any]:
+    return {f"{s}_{prefix}": None for s in [
+        "mean_abs", "median_abs", "min_abs", "max_abs", "std_abs",
+        "mean_uq", "median_uq", "min_uq", "max_uq", "std_uq",
+        "pearson_corr", "spearman_corr"
+    ]}
+
+
+def compute_slice_level_stats(
     pat_id: str,
     roots: Dict[Union[int, str], Path],
     acc_factors: List[int],
-    decimals: int = 2,
     debug: bool = False,
-):
+) -> List[Dict[str, Any]]:
+    """
+    Compute slice-level statistics for a single patient.
+
+    Args:
+        pat_id (str): Patient ID.
+        roots (Dict[Union[int, str], Path]): Dictionary of paths for data.
+        acc_factors (List[int]): Acceleration factors to process.
+        debug (bool): If True, print debug information.
+
+    Returns:
+        List[Dict[str, Any]]: List of dictionaries containing slice-level statistics.
+    """
+
     # Load R1 and Load lesion
     pat_root          = roots['reader_study'] / pat_id
     r1_img            = sitk.ReadImage(str(pat_root / f"{pat_id}_rss_target_dcml.mha"))
@@ -80,86 +126,44 @@ def extract_and_store_correlation_uq_vs_abs(
     r6_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots["R6"] / pat_id / f"uq_map_R6_gm25.nii.gz")))
     print(f"\tR6 UQ map stats: max={np.max(r6_uq_map_arr)}, min={np.min(r6_uq_map_arr)}, mean={np.mean(r6_uq_map_arr)}, median={np.median(r6_uq_map_arr)}, std={np.std(r6_uq_map_arr)}, shape={r6_uq_map_arr.shape}")
 
+    # ---- MAIN LOOP ---- over, Acceleration Factor and Slices
     all_slice_stats = []
     for acc in acc_factors:
         abs_arr = r3_abs_error_arr if acc == 3 else r6_abs_error_arr
         uq_arr  = r3_uq_map_arr    if acc == 3 else r6_uq_map_arr
+        
         for i in range(r1_arr.shape[0]):
             slice_stat = {
                 "pat_id": pat_id,
                 "slice_idx": i,
                 "acc_factor": acc,
             }
-            # ----- Whole Slice Stats -----
-            slice_stat.update({
-                "mean_abs_slice":   np.mean(abs_arr[i]),
-                "median_abs_slice": np.median(abs_arr[i]),
-                "max_abs_slice":    np.max(abs_arr[i]),
-                "std_abs_slice":    np.std(abs_arr[i]),
-                "mean_uq_slice":    np.mean(uq_arr[i]),
-                "median_uq_slice":  np.median(uq_arr[i]),
-                "max_uq_slice":     np.max(uq_arr[i]),
-                "std_uq_slice":     np.std(uq_arr[i]),
-            })
+            # --- Whole slice stats ---
+            abs_vals = abs_arr[i].flatten()
+            uq_vals  = uq_arr[i].flatten()
+            slice_stat.update(compute_region_stats(abs_vals, uq_vals, "slice"))
 
             # ----- Prostate stats -----
-            prostate_mask = prost_seg_arr[i] == 1
-            if np.any(prostate_mask):
-                abs_vals = abs_arr[i][prostate_mask]
-                uq_vals  = uq_arr[i][prostate_mask]
-                slice_stat.update({
-                    "mean_abs_prostate":   np.mean(abs_vals),
-                    "median_abs_prostate": np.median(abs_vals),
-                    "max_abs_prostate":    np.max(abs_vals),
-                    "std_abs_prostate":    np.std(abs_vals),
-                    "mean_uq_prostate":    np.mean(uq_vals),
-                    "median_uq_prostate":  np.median(uq_vals),
-                    "max_uq_prostate":     np.max(uq_vals),
-                    "std_uq_prostate":     np.std(uq_vals),
-                })
+            pr_mask = prost_seg_arr[i] == 1
+            if np.any(pr_mask):
+                abs_vals = abs_arr[i][pr_mask]
+                uq_vals  = uq_arr[i][pr_mask]
+                slice_stat.update(compute_region_stats(abs_vals, uq_vals, "prostate"))
             else:
-                slice_stat.update({
-                    "mean_abs_prostate": None,
-                    "median_abs_prostate": None,
-                    "max_abs_prostate": None,
-                    "std_abs_prostate": None,
-                    "mean_uq_prostate": None,
-                    "median_uq_prostate": None,
-                    "max_uq_prostate": None,
-                    "std_uq_prostate": None,
-                })
+                slice_stat.update(empty_region_stats("prostate"))
 
-            # ----- Lesion stats -----
-            lesion_mask = roi_arr[i] > 0
-            if np.any(lesion_mask):
-                abs_vals = abs_arr[i][lesion_mask]
-                uq_vals  = uq_arr[i][lesion_mask]
-
-                slice_stat.update({
-                    "mean_abs_lesion":   np.mean(abs_vals),
-                    "median_abs_lesion": np.median(abs_vals),
-                    "max_abs_lesion":    np.max(abs_vals),
-                    "std_abs_lesion":    np.std(abs_vals),
-                    "mean_uq_lesion":    np.mean(uq_vals),
-                    "median_uq_lesion":  np.median(uq_vals),
-                    "max_uq_lesion":     np.max(uq_vals),
-                    "std_uq_lesion":     np.std(uq_vals),
-                })
+            # --- Lesion stats ---
+            ls_mask = roi_arr[i] > 0
+            if np.any(ls_mask):
+                abs_vals = abs_arr[i][ls_mask]
+                uq_vals  = uq_arr[i][ls_mask]
+                slice_stat.update(compute_region_stats(abs_vals, uq_vals, "lesion"))
             else:
-                slice_stat.update({
-                    "mean_abs_lesion": None,
-                    "median_abs_lesion": None,
-                    "max_abs_lesion": None,
-                    "std_abs_lesion": None,
-                    "mean_uq_lesion": None,
-                    "median_uq_lesion": None,
-                    "max_uq_lesion": None,
-                    "std_uq_lesion": None,
-                })
+                slice_stat.update(empty_region_stats("lesion"))
 
             all_slice_stats.append(slice_stat)
 
-    if debug:
+    if VERBPSE:
         print(f"\n🔎 {len(all_slice_stats)} slice-level rows collected for patient {pat_id}")
         for row in all_slice_stats:  # print first few
             print(f"  ➤ Slice {row['slice_idx']} @ R={row['acc_factor']}: "
@@ -167,6 +171,128 @@ def extract_and_store_correlation_uq_vs_abs(
 
     return all_slice_stats
 
+
+def process_patients_and_store_stats(
+    pat_ids: List[str],
+    roots: Dict[Union[int, str], Path],
+    acc_factors: List[int],
+    db_fpath: Path,
+    table_name: str = "uq_vs_abs_stats",
+    debug: bool = False,
+):
+    """
+    Process multiple patients, compute slice-level statistics, and store them in a SQLite database.
+
+    Args:
+        pat_ids (List[str]): List of patient IDs to process.
+        roots (Dict[Union[int, str], Path]): Dictionary of paths for data.
+        acc_factors (List[int]): Acceleration factors to process.
+        db_fpath (Path): Path to the SQLite database file.
+        table_name (str): Name of the table to store the statistics.
+        debug (bool): If True, print debug information.
+
+    Returns:
+        None
+    """
+    all_stats = []
+
+    # Process each patient
+    for idx, pat_id in enumerate(pat_ids):
+        print(f"\n{idx + 1}/{len(pat_ids)} Processing patient {pat_id}...")
+        slice_stats = compute_slice_level_stats(
+            pat_id=pat_id,
+            roots=roots,
+            acc_factors=acc_factors,
+            debug=debug,
+        )
+        all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
+
+    stats_df = pd.DataFrame(all_stats)
+
+    # Store in SQLite database
+    print(f"\nStoring results in SQLite database: {db_fpath}")
+    with sqlite3.connect(str(db_fpath)) as conn:
+        stats_df.to_sql(table_name, conn, if_exists="replace", index=False)
+    print(f"Data successfully stored in table '{table_name}'.")
+
+    if debug:
+        print(f"\nPreview of stored data:")
+        print(stats_df.head())
+
+
+def create_table_if_not_exists(db_fpath: Path, table_name: str, debug: bool = False):
+    """
+    Create a new table in the SQLite database if it does not already exist.
+    If debug is True, '_debug' is appended to the table name.
+
+    Args:
+        db_fpath (Path): Path to the SQLite database file.
+        table_name (str): Name of the table to create.
+        debug (bool): If True, append '_debug' to the table name.
+
+    Returns:
+        str: The final table name used.
+    """
+    # Append '_debug' to the table name if debug is True
+    final_table_name = f"{table_name}_debug" if debug else table_name
+
+    # Define the SQL command to create the table
+    create_table_sql = f"""
+    CREATE TABLE IF NOT EXISTS {final_table_name} (
+        pat_id TEXT,
+        slice_idx INTEGER,
+        acc_factor INTEGER,
+        mean_abs_slice REAL,
+        median_abs_slice REAL,
+        min_abs_slice REAL,
+        max_abs_slice REAL,
+        std_abs_slice REAL,
+        mean_uq_slice REAL,
+        median_uq_slice REAL,
+        min_uq_slice REAL,
+        max_uq_slice REAL,
+        std_uq_slice REAL,
+        pearson_corr_slice REAL,
+        spearman_corr_slice REAL,
+        mean_abs_prostate REAL,
+        median_abs_prostate REAL,
+        min_abs_prostate REAL,
+        max_abs_prostate REAL,
+        std_abs_prostate REAL,
+        mean_uq_prostate REAL,
+        median_uq_prostate REAL,
+        min_uq_prostate REAL,
+        max_uq_prostate REAL,
+        std_uq_prostate REAL,
+        pearson_corr_prostate REAL,
+        spearman_corr_prostate REAL,
+        mean_abs_lesion REAL,
+        median_abs_lesion REAL,
+        min_abs_lesion REAL,
+        max_abs_lesion REAL,
+        std_abs_lesion REAL,
+        mean_uq_lesion REAL,
+        median_uq_lesion REAL,
+        min_uq_lesion REAL,
+        max_uq_lesion REAL,
+        std_uq_lesion REAL,
+        pearson_corr_lesion REAL,
+        spearman_corr_lesion REAL
+    );
+    """
+
+    # Connect to the database and execute the SQL command
+    try:
+        with sqlite3.connect(str(db_fpath)) as conn:
+            cursor = conn.cursor()
+            cursor.execute(create_table_sql)
+            conn.commit()
+        print(f"Table '{final_table_name}' created successfully (or already exists).")
+    except sqlite3.Error as e:
+        print(f"SQLite error while creating table '{final_table_name}': {e}")
+        raise
+
+    return final_table_name
 
 
 
@@ -306,17 +432,21 @@ if __name__ == '__main__':
         'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
     }
     debug         = True
-    do_adapt_clip = True
+    VERBOSE       = True
     acc_factors   = [3, 6] # Define the set of acceleration factors we care about.
-    decimals      = 4      # Number of decimals to round to
+    
+    table_name = create_table_if_not_exists(
+        db_fpath   = roots["db_fpath_new"],
+        table_name = "slice_level_uq_stats",
+        debug      = debug,
+    )
 
-    for idx, pat_id in enumerate(pat_ids):
-        # progression print
-        print(f"\n{idx}/{len(pat_ids)} Extracting and storing correlation for patient {pat_id}...")
-        extract_and_store_correlation_uq_vs_abs(
-            pat_id      = pat_id,
-            roots       = roots,
-            acc_factors = acc_factors,
-            decimals    = decimals,
-            debug       = debug,
-        )
+    # Process patients and store results
+    process_patients_and_store_stats(
+        pat_ids = pat_ids,
+        roots = roots,
+        acc_factors = acc_factors,
+        db_fpath = roots["db_fpath_new"],
+        table_name = table_name,
+        debug = debug,
+    )
