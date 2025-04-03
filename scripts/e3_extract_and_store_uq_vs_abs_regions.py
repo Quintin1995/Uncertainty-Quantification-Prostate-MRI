@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any, Union
 from scipy.stats import spearmanr
 
-from dicom_utils import resample_to_reference
-from uncertainty_quantification import apply_percentile_threshold
+from scripts.assets.dicom_utils import resample_to_reference
+from scripts.assets.uncertainty_quantification import apply_percentile_threshold
 
 
 # DOCUMENTATION
@@ -163,7 +163,7 @@ def compute_slice_level_stats(
 
             all_slice_stats.append(slice_stat)
 
-    if VERBPSE:
+    if VERBOSE:
         print(f"\n🔎 {len(all_slice_stats)} slice-level rows collected for patient {pat_id}")
         for row in all_slice_stats:  # print first few
             print(f"  ➤ Slice {row['slice_idx']} @ R={row['acc_factor']}: "
@@ -206,7 +206,6 @@ def process_patients_and_store_stats(
             debug=debug,
         )
         all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
-
     stats_df = pd.DataFrame(all_stats)
 
     # Store in SQLite database
