@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any, Union
 from scipy.stats import spearmanr
 
-from scripts.assets.dicom_utils import resample_to_reference
-from scripts.assets.uncertainty_quantification import apply_percentile_threshold
+from assets.dicom_utils import resample_to_reference
+from assets.uncertainty_quantification import apply_percentile_threshold
+from assets.image_operations import apply_gaussian_blur_3d
 
 
 # DOCUMENTATION
@@ -36,6 +37,12 @@ from scripts.assets.uncertainty_quantification import apply_percentile_threshold
 def get_combined_rois_array(pat_root: Path, r1_ref_image: sitk.Image, r1_arr: np.ndarray) -> Tuple[np.ndarray, List[int]]:
     roi_fpaths = list(pat_root.glob("*_roi_*.mha"))
     roi_arrs_combined = np.zeros_like(r1_arr)
+
+    # Check if any ROI files are found
+    if len(roi_fpaths) == 0:
+        print(f"\tNo ROIs found in {pat_root.name}.")
+        return roi_arrs_combined, []
+
     for roi_fpath in roi_fpaths:
         roi_img = sitk.ReadImage(str(roi_fpath))
         roi_img_resampled = resample_to_reference(roi_img, r1_ref_image)
@@ -82,6 +89,7 @@ def compute_slice_level_stats(
     pat_id: str,
     roots: Dict[Union[int, str], Path],
     acc_factors: List[int],
+    do_blurring: bool = False,
     debug: bool = False,
 ) -> List[Dict[str, Any]]:
     """
@@ -114,17 +122,27 @@ def compute_slice_level_stats(
     r3_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R3_recon_dcml.mha")))
     print(f"\tR3 reconstruction stats: max={np.max(r3_arr)}, min={np.min(r3_arr)}, mean={np.mean(r3_arr)}, median={np.median(r3_arr)}, std={np.std(r3_arr)}, shape={r3_arr.shape}")
     r3_abs_error_arr  = np.abs(r1_arr - r3_arr)
+    # r3_abs_error_blu_arr = apply_gaussian_blur_3d(r3_abs_error_arr, sigma_xy=1.0, sigma_z=0.0)
     print(f"\tR3 Absolute Error stats: max={np.max(r3_abs_error_arr)}, min={np.min(r3_abs_error_arr)}, mean={np.mean(r3_abs_error_arr)}, median={np.median(r3_abs_error_arr)}, std={np.std(r3_abs_error_arr)}, shape={r3_abs_error_arr.shape}")
     r3_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots['R3'] / pat_id / f"uq_map_R3_gm25.nii.gz")))
+    # r3_uq_map_blu_arr = apply_gaussian_blur_3d(r3_uq_map_arr, sigma_xy=1.0, sigma_z=0.0)
     print(f"\tR3 UQ map stats: max={np.max(r3_uq_map_arr)}, min={np.min(r3_uq_map_arr)}, mean={np.mean(r3_uq_map_arr)}, median={np.median(r3_uq_map_arr)}, std={np.std(r3_uq_map_arr)}, shape={r3_uq_map_arr.shape}")
 
     # Load R6 Reconstruction --> compute Absolute Error and Load UQ map
     r6_arr            = sitk.GetArrayFromImage(sitk.ReadImage(str(pat_root / f"{pat_id}_VSharp_R6_recon_dcml.mha")))
     print(f"\tR6 reconstruction stats: max={np.max(r6_arr)}, min={np.min(r6_arr)}, mean={np.mean(r6_arr)}, median={np.median(r6_arr)}, std={np.std(r6_arr)}, shape={r6_arr.shape}")
     r6_abs_error_arr  = np.abs(r1_arr - r6_arr)
+    # r6_abs_error_blu_arr = apply_gaussian_blur_3d(r6_abs_error_arr, sigma_xy=1.0, sigma_z=0.0)
     print(f"\tR6 Absolute Error stats: max={np.max(r6_abs_error_arr)}, min={np.min(r6_abs_error_arr)}, mean={np.mean(r6_abs_error_arr)}, median={np.median(r6_abs_error_arr)}, std={np.std(r6_abs_error_arr)}, shape={r6_abs_error_arr.shape}")
     r6_uq_map_arr     = sitk.GetArrayFromImage(sitk.ReadImage(str(roots["R6"] / pat_id / f"uq_map_R6_gm25.nii.gz")))
+    # r6_uq_map_blu_arr = apply_gaussian_blur_3d(r6_uq_map_arr, sigma_xy=1.0, sigma_z=0.0)
     print(f"\tR6 UQ map stats: max={np.max(r6_uq_map_arr)}, min={np.min(r6_uq_map_arr)}, mean={np.mean(r6_uq_map_arr)}, median={np.median(r6_uq_map_arr)}, std={np.std(r6_uq_map_arr)}, shape={r6_uq_map_arr.shape}")
+
+    if do_blurring:
+        r3_abs_error_arr = apply_gaussian_blur_3d(r3_abs_error_arr, sigma_xy=1.0, sigma_z=0.0)
+        r3_uq_map_arr    = apply_gaussian_blur_3d(r3_uq_map_arr, sigma_xy=1.0, sigma_z=0.0)
+        r6_abs_error_arr = apply_gaussian_blur_3d(r6_abs_error_arr, sigma_xy=1.0, sigma_z=0.0)
+        r6_uq_map_arr    = apply_gaussian_blur_3d(r6_uq_map_arr, sigma_xy=1.0, sigma_z=0.0)
 
     # ---- MAIN LOOP ---- over, Acceleration Factor and Slices
     all_slice_stats = []
@@ -178,6 +196,7 @@ def process_patients_and_store_stats(
     acc_factors: List[int],
     db_fpath: Path,
     table_name: str = "uq_vs_abs_stats",
+    do_blurring: bool = False,
     debug: bool = False,
 ):
     """
@@ -200,10 +219,11 @@ def process_patients_and_store_stats(
     for idx, pat_id in enumerate(pat_ids):
         print(f"\n{idx + 1}/{len(pat_ids)} Processing patient {pat_id}...")
         slice_stats = compute_slice_level_stats(
-            pat_id=pat_id,
-            roots=roots,
-            acc_factors=acc_factors,
-            debug=debug,
+            pat_id      = pat_id,
+            roots       = roots,
+            acc_factors = acc_factors,
+            do_blurring = do_blurring,
+            debug       = debug,
         )
         all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
     stats_df = pd.DataFrame(all_stats)
@@ -303,7 +323,7 @@ if __name__ == '__main__':
         # '0004_ANON9616598',
         # '0005_ANON8290811',
         # '0006_ANON2379607',
-        '0007_ANON1586301',
+        # '0007_ANON1586301',
         # '0008_ANON8890538',
         # '0010_ANON7748752',
         # '0011_ANON1102778',
@@ -313,52 +333,52 @@ if __name__ == '__main__':
         # '0015_ANON9844606',
         # '0018_ANON9843837',
         # '0019_ANON7657657',
-        # '0020_ANON1562419',
-        # '0021_ANON4277586',
-        # '0023_ANON6964611',
-        # '0024_ANON7992094',
-        # '0026_ANON3620419',
-        # '0027_ANON9724912',
-        # '0028_ANON3394777',
-        # '0029_ANON7189994',
-        # '0030_ANON3397001',
-        # '0031_ANON9141039',
-        # '0032_ANON7649583',
-        # '0033_ANON9728185',
-        # '0035_ANON3474225',
-        # '0036_ANON0282755',
-        # '0037_ANON0369080',
-        # '0039_ANON0604912',
-        # '0042_ANON9423619',
-        # '0043_ANON7041133',
-        # '0044_ANON8232550',
-        # '0045_ANON2563804',
-        # '0047_ANON3613611',
-        # '0048_ANON6365688',
-        # '0049_ANON9783006',
-        # '0051_ANON1327674',
-        # '0052_ANON9710044',
-        # '0053_ANON5517301',
-        # '0055_ANON3357872',
-        # '0056_ANON2124757',
-        # '0057_ANON1070291',
-        # '0058_ANON9719981',
-        # '0059_ANON7955208',
-        # '0061_ANON7642254',
-        # '0062_ANON0319974',
-        # '0063_ANON9972960',
-        # '0064_ANON0282398',
-        # '0067_ANON0913099',
-        # '0068_ANON7978458',
-        # '0069_ANON9840567',
-        # '0070_ANON5223499',
-        # '0071_ANON9806291',
-        # '0073_ANON5954143',
-        # '0075_ANON5895496',
-        # '0076_ANON3983890',
-        # '0077_ANON8634437',
-        # '0078_ANON6883869',
-        # '0079_ANON8828023',
+        '0020_ANON1562419',
+        '0021_ANON4277586',
+        '0023_ANON6964611',
+        '0024_ANON7992094',
+        '0026_ANON3620419',
+        '0027_ANON9724912',
+        '0028_ANON3394777',
+        '0029_ANON7189994',
+        '0030_ANON3397001',
+        '0031_ANON9141039',
+        '0032_ANON7649583',
+        '0033_ANON9728185',
+        '0035_ANON3474225',
+        '0036_ANON0282755',
+        '0037_ANON0369080',
+        '0039_ANON0604912',
+        '0042_ANON9423619',
+        '0043_ANON7041133',
+        '0044_ANON8232550',
+        '0045_ANON2563804',
+        '0047_ANON3613611',
+        '0048_ANON6365688',
+        '0049_ANON9783006',
+        '0051_ANON1327674',
+        '0052_ANON9710044',
+        '0053_ANON5517301',
+        '0055_ANON3357872',
+        '0056_ANON2124757',
+        '0057_ANON1070291',
+        '0058_ANON9719981',
+        '0059_ANON7955208',
+        '0061_ANON7642254',
+        '0062_ANON0319974',
+        '0063_ANON9972960',
+        '0064_ANON0282398',
+        '0067_ANON0913099',
+        '0068_ANON7978458',
+        '0069_ANON9840567',
+        '0070_ANON5223499',
+        '0071_ANON9806291',
+        '0073_ANON5954143',
+        '0075_ANON5895496',
+        '0076_ANON3983890',
+        '0077_ANON8634437',
+        '0078_ANON6883869',
+        '0079_ANON8828023',
         # '0080_ANON4499321',
         # '0081_ANON9763928',
         # '0082_ANON6073234',
@@ -430,22 +450,24 @@ if __name__ == '__main__':
         'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
         'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
     }
-    debug         = True
-    VERBOSE       = True
+    do_blurring   = True
     acc_factors   = [3, 6] # Define the set of acceleration factors we care about.
+    DEBUG         = True
+    VERBOSE       = True
     
     table_name = create_table_if_not_exists(
         db_fpath   = roots["db_fpath_new"],
         table_name = "slice_level_uq_stats",
-        debug      = debug,
+        debug      = DEBUG,
     )
 
     # Process patients and store results
     process_patients_and_store_stats(
-        pat_ids = pat_ids,
-        roots = roots,
+        pat_ids     = pat_ids,
+        roots       = roots,
         acc_factors = acc_factors,
-        db_fpath = roots["db_fpath_new"],
-        table_name = table_name,
-        debug = debug,
+        db_fpath    = roots["db_fpath_new"],
+        table_name  = table_name,
+        do_blurring = do_blurring,
+        debug       = DEBUG,
     )
