@@ -319,20 +319,20 @@ if __name__ == '__main__':
 
     # All patient IDs to consider for Uncertainty Quantification
     pat_ids = [
-        # '0003_ANON5046358',
-        # '0004_ANON9616598',
-        # '0005_ANON8290811',
-        # '0006_ANON2379607',
-        # '0007_ANON1586301',
-        # '0008_ANON8890538',
-        # '0010_ANON7748752',
-        # '0011_ANON1102778',
-        # '0012_ANON4982869',
-        # '0013_ANON7362087',
-        # '0014_ANON3951049',
-        # '0015_ANON9844606',
-        # '0018_ANON9843837',
-        # '0019_ANON7657657',
+        '0003_ANON5046358',
+        '0004_ANON9616598',
+        '0005_ANON8290811',
+        '0006_ANON2379607',
+        '0007_ANON1586301',
+        '0008_ANON8890538',
+        '0010_ANON7748752',
+        '0011_ANON1102778',
+        '0012_ANON4982869',
+        '0013_ANON7362087',
+        '0014_ANON3951049',
+        '0015_ANON9844606',
+        '0018_ANON9843837',
+        '0019_ANON7657657',
         '0020_ANON1562419',
         '0021_ANON4277586',
         '0023_ANON6964611',
@@ -452,7 +452,7 @@ if __name__ == '__main__':
     }
     do_blurring   = True
     acc_factors   = [3, 6] # Define the set of acceleration factors we care about.
-    DEBUG         = True
+    DEBUG         = False
     VERBOSE       = True
     
     table_name = create_table_if_not_exists(
