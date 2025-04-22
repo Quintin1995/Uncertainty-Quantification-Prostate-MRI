@@ -90,7 +90,7 @@ def compute_slice_level_stats(
     roots: Dict[Union[int, str], Path],
     acc_factors: List[int],
     do_blurring: bool = False,
-    debug: bool = False,
+    undersamp_method: str = "gaussian",
 ) -> List[Dict[str, Any]]:
     """
     Compute slice-level statistics for a single patient.
@@ -155,6 +155,7 @@ def compute_slice_level_stats(
                 "pat_id": pat_id,
                 "slice_idx": i,
                 "acc_factor": acc,
+                "undersampling_method": undersamp_method,
             }
             # --- Whole slice stats ---
             abs_vals = abs_arr[i].flatten()
@@ -197,6 +198,7 @@ def process_patients_and_store_stats(
     db_fpath: Path,
     table_name: str = "uq_vs_abs_stats",
     do_blurring: bool = False,
+    undersamp_method: str = "gaussian",
     debug: bool = False,
 ):
     """
@@ -219,11 +221,12 @@ def process_patients_and_store_stats(
     for idx, pat_id in enumerate(pat_ids):
         print(f"\n{idx + 1}/{len(pat_ids)} Processing patient {pat_id}...")
         slice_stats = compute_slice_level_stats(
-            pat_id      = pat_id,
-            roots       = roots,
-            acc_factors = acc_factors,
-            do_blurring = do_blurring,
-            debug       = debug,
+            pat_id           = pat_id,
+            roots            = roots,
+            acc_factors      = acc_factors,
+            do_blurring      = do_blurring,
+            debug            = debug,
+            undersamp_method = undersamp_method,
         )
         all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
     stats_df = pd.DataFrame(all_stats)
@@ -261,6 +264,7 @@ def create_table_if_not_exists(db_fpath: Path, table_name: str, debug: bool = Fa
         pat_id TEXT,
         slice_idx INTEGER,
         acc_factor INTEGER,
+        undersampling_method TEXT,
         mean_abs_slice REAL,
         median_abs_slice REAL,
         min_abs_slice REAL,
@@ -441,19 +445,21 @@ if __name__ == '__main__':
         # '0160_ANON3504149'
     ]
 
+    undersamp_method = "gaussian"  # or "uniform"
+    do_blurring      = True
+    acc_factors      = [3, 6] # Define the set of acceleration factors we care about.
+    DEBUG            = False
+    VERBOSE          = True
+
     roots = {
         'reader_study':      Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
         'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
-        'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{3}x"),
-        'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_{6}x"),
+        'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{undersamp_method}/recons_{3}x"),
+        'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{undersamp_method}/recons_{6}x"),
         'kspace_root':       Path('/scratch/p290820/datasets/003_umcg_pst_ksps'),
         'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
         'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
     }
-    do_blurring   = True
-    acc_factors   = [3, 6] # Define the set of acceleration factors we care about.
-    DEBUG         = False
-    VERBOSE       = True
     
     table_name = create_table_if_not_exists(
         db_fpath   = roots["db_fpath_new"],
@@ -463,11 +469,12 @@ if __name__ == '__main__':
 
     # Process patients and store results
     process_patients_and_store_stats(
-        pat_ids     = pat_ids,
-        roots       = roots,
-        acc_factors = acc_factors,
-        db_fpath    = roots["db_fpath_new"],
-        table_name  = table_name,
-        do_blurring = do_blurring,
-        debug       = DEBUG,
+        pat_ids          = pat_ids,
+        roots            = roots,
+        acc_factors      = acc_factors,
+        db_fpath         = roots["db_fpath_new"],
+        table_name       = table_name,
+        do_blurring      = do_blurring,
+        undersamp_method = undersamp_method,
+        debug            = DEBUG,
     )
