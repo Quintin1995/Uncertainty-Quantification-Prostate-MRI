@@ -117,6 +117,157 @@ source /home1/p290820/repos/direct-with-averages/env/bin/activate
 
 # NOTE: It seems that the interactive GPU 2 cannot run the program with multi treading, but requesting another GPU works fine.
 
+# LXO Method (R=3) - DEBUG TEST
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 0
+
+
+
+
+
+# R3 LXO
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold0.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold1.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold2.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+    # R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold3.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold4.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold5.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=3 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_3x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r3_lxo_fold6.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+
+
+
+
+# R6 LXO
+# R=6 lets fold over all indexes then.  DONE
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold0.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then.   DONE
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold1.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then.   DONE
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold2.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then. DONE
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold3.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold4.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold5.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+# R=6 lets fold over all indexes then.
+direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_6x \
+    --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/lxo/vsharp_r6_lxo_fold6.yaml \
+    --data-root /scratch/p290820/datasets/003_umcg_pst_ksps/data \
+    --checkpoint /scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.pt \
+    --filenames-filter /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/debug_test_small_umcg_positives_total1.lst \
+    --num-gpus 1 \
+    --num-workers 8
+
+
+
+
+
+
+
 # GAUSSIAN (R=3) - DEBUG TEST
 direct predict /scratch/hb-pca-rad/projects/04_uncertainty_quantification/gaussian/recons_3x \
     --cfg /home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/configs/vsharp/vsharp_r3_gaussian.yaml \
