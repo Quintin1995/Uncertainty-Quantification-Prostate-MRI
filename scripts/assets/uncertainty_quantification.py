@@ -4,24 +4,69 @@ from pathlib import Path
 import SimpleITK as sitk
 
 
-def calculate_uncertainty_map(reconstructions: np.ndarray, debug=False) -> np.ndarray:
+def calculate_uncertainty_map(
+    reconstructions: np.ndarray,
+    method: str = 'std',
+    percentile: tuple[float, float] = (2.5, 97.5),
+    debug: bool = False
+) -> np.ndarray:
     """
-    Calculate the uncertainty map by computing the standard deviation across reconstructions.
-    
+    Calculate the uncertainty map from a stack of reconstructions.
+
     Args:
-        reconstructions (np.ndarray): 4D NumPy array with shape (num_reconstructions, slices, rows, cols).
-    
+        reconstructions (np.ndarray):
+            4D array of shape (num_recon, slices, rows, cols).
+        method (str):
+            One of {'std', 'cv', 'mad', 'iqr', 'pi'}:
+              - 'std':      pixel-wise standard deviation.
+              - 'cv':       coefficient of variation (std / mean).
+              - 'mad':      median absolute deviation.
+              - 'iqr':      interquartile range (75th–25th percentile).
+              - 'pi':       percentile interval width (e.g., 95% PI).
+        percentile (tuple):
+            Lower and upper percentiles for 'pi' (default 2.5, 97.5).
+        debug (bool):
+            Print shape and min/max of result.
+
     Returns:
-        np.ndarray: 3D NumPy array representing the uncertainty map with shape (slices, rows, cols).
+        np.ndarray:
+            3D uncertainty map (slices, rows, cols).
     """
-    assert isinstance(reconstructions, np.ndarray), "reconstructions must be a NumPy array."
-    assert reconstructions.ndim == 4, f"Expected 4D array, got {reconstructions.ndim}D array."
+    assert isinstance(reconstructions, np.ndarray), "need NumPy array"
+    assert reconstructions.ndim == 4, f"Expected 4D, got {reconstructions.ndim}D"
+    method = method.lower()
     
-    uq_map = reconstructions.std(axis=0)
-    if debug: 
-        print(f"\tShape of uncertainty map: {uq_map.shape}")
-        print(f"\tMin max of the uncertainty map (rounded): {np.round(uq_map.min(), 4)} - {np.round(uq_map.max(), 4)}")
-    return uq_map
+    if method == 'std':
+        uq = reconstructions.std(axis=0)
+    
+    elif method == 'cv':
+        mean = reconstructions.mean(axis=0)
+        std  = reconstructions.std(axis=0)
+        # avoid divide-by-zero; set CV to nan where mean≈0
+        uq = np.where(np.abs(mean) > 1e-8, std / np.abs(mean), np.nan)
+    
+    elif method == 'mad':
+        med = np.median(reconstructions, axis=0)
+        uq = np.median(np.abs(reconstructions - med), axis=0)
+    
+    elif method == 'iqr':
+        p75 = np.percentile(reconstructions, 75, axis=0)
+        p25 = np.percentile(reconstructions, 25, axis=0)
+        uq = p75 - p25
+    
+    elif method == 'pi':
+        low, high = percentile
+        p_lo = np.percentile(reconstructions, low, axis=0)
+        p_hi = np.percentile(reconstructions, high, axis=0)
+        uq = p_hi - p_lo
+    
+    else:
+        raise ValueError(f"Unknown method '{method}'. Choose from 'std','cv','mad','iqr','pi'.")
+    
+    if debug:
+        print(f"\t[UQ:{method}] shape {uq.shape}; min–max ≈ {uq.min():.4f}–{uq.max():.4f}")
+    return uq
+
 
 
 def apply_percentile_threshold(uq_map: np.ndarray, percentile: float = 95.0, debug=False) -> np.ndarray:
