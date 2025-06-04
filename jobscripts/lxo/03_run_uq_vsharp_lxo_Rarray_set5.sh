@@ -35,7 +35,7 @@ CKPT="/scratch/hb-pca-rad/projects/03_nki_reader_study/checkpoints/model_152000.
 # Derive variables
 LIST="/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/lists/split_by_20/umcg_0001_0172_${LIST_IDX}.lst"
 R=$SLURM_ARRAY_TASK_ID
-PRED_DIR="/scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_R${R}x"
+PRED_DIR="/scratch/hb-pca-rad/projects/04_uncertainty_quantification/lxo/recons_${R}x"
 mkdir -p "${PRED_DIR}"
 
 echo "[$(date +'%F %T')] Starting UQ recon: R=${R}× with ${NUM_FOLDS} folds"

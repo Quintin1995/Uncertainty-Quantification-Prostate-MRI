@@ -6,18 +6,18 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=96G
-#SBATCH --time=03:00:00
-#SBATCH --array=3,6              # R values: 3× and 6× acceleration
+#SBATCH --time=02:00:00
+#SBATCH --array=6              # R values: 3× and 6× acceleration
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=q.y.van.lohuizen@umcg.nl
-#SBATCH --output=/scratch/hb-pca-rad/projects/04_uncertainty_quantification/logs/uq_vsharp_R%a_%A_patset2.out
-#SBATCH --error=/scratch/hb-pca-rad/projects/04_uncertainty_quantification/logs/uq_vsharp_R%a_%A_patset2.err
+#SBATCH --output=/scratch/hb-pca-rad/projects/04_uncertainty_quantification/logs/uq_vsharp_R%a_%A_patset5.out
+#SBATCH --error=/scratch/hb-pca-rad/projects/04_uncertainty_quantification/logs/uq_vsharp_R%a_%A_patset5.err
 
 # Configuration parameters
 # Number of leave-one-out folds you want per R
 NUM_FOLDS=6
 # Goest from 1 to 6, depending on the list you want to use
-LIST_IDX=2
+LIST_IDX=5
 
 # Load modules and activate environment
 set -euo pipefail
