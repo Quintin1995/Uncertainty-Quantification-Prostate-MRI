@@ -91,6 +91,7 @@ def compute_slice_level_stats(
     acc_factors: List[int],
     do_blurring: bool = False,
     undersamp_method: str = "gaussian",
+    debug: bool = False,
 ) -> List[Dict[str, Any]]:
     """
     Compute slice-level statistics for a single patient.
@@ -193,13 +194,13 @@ def compute_slice_level_stats(
 
 def process_patients_and_store_stats(
     pat_ids: List[str],
-    roots: Dict[Union[int, str], Path],
+    roots: Dict[str, Path],
     acc_factors: List[int],
     db_fpath: Path,
-    table_name: str = "uq_vs_abs_stats",
-    do_blurring: bool = False,
+    table_name: str       = "uq_vs_abs_stats",
+    do_blurring: bool     = False,
     undersamp_method: str = "gaussian",
-    debug: bool = False,
+    debug: bool           = False,
 ):
     """
     Process multiple patients, compute slice-level statistics, and store them in a SQLite database.
@@ -225,8 +226,8 @@ def process_patients_and_store_stats(
             roots            = roots,
             acc_factors      = acc_factors,
             do_blurring      = do_blurring,
-            debug            = debug,
             undersamp_method = undersamp_method,
+            debug            = debug,
         )
         all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
     stats_df = pd.DataFrame(all_stats)
@@ -445,36 +446,36 @@ if __name__ == '__main__':
         # '0160_ANON3504149'
     ]
 
-    undersamp_method = "gaussian"  # or "uniform"
     do_blurring      = True
     acc_factors      = [3, 6] # Define the set of acceleration factors we care about.
     DEBUG            = False
     VERBOSE          = True
+    undersample_methods = ["gaussian", "lxo"]
 
-    roots = {
-        'reader_study':      Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
-        'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
-        'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{undersamp_method}/recons_{3}x"),
-        'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{undersamp_method}/recons_{6}x"),
-        'kspace_root':       Path('/scratch/p290820/datasets/003_umcg_pst_ksps'),
-        'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
-        'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
-    }
-    
-    table_name = create_table_if_not_exists(
-        db_fpath   = roots["db_fpath_new"],
-        table_name = "slice_level_uq_stats",
-        debug      = DEBUG,
-    )
+    for u_method in undersample_methods:
+        roots = {
+            'reader_study':      Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
+            'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
+            'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{3}x"),
+            'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{6}x"),
+            'kspace_root':       Path('/scratch/p290820/datasets/003_umcg_pst_ksps'),
+            'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
+            'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
+        }
+        
+        table_name = create_table_if_not_exists(
+            db_fpath   = roots["db_fpath_new"],
+            table_name = "uq_vs_error_correlation_cv",
+            debug      = DEBUG,
+        )
 
-    # Process patients and store results
-    process_patients_and_store_stats(
-        pat_ids          = pat_ids,
-        roots            = roots,
-        acc_factors      = acc_factors,
-        db_fpath         = roots["db_fpath_new"],
-        table_name       = table_name,
-        do_blurring      = do_blurring,
-        undersamp_method = undersamp_method,
-        debug            = DEBUG,
-    )
+        process_patients_and_store_stats(
+            pat_ids          = pat_ids,
+            roots            = roots,
+            acc_factors      = acc_factors,
+            db_fpath         = roots["db_fpath_new"],
+            table_name       = table_name,
+            do_blurring      = do_blurring,
+            undersamp_method = u_method,
+            debug            = DEBUG,
+        )
