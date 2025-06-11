@@ -85,26 +85,115 @@ def empty_region_stats(prefix: str) -> Dict[str, Any]:
     ]}
 
 
-def compute_slice_level_stats(
+
+# from here it is generated.
+def load_reference_and_masks(pat_id: str, roots: Dict[str, Path]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    pat_root = roots["reader_study"] / pat_id
+    r1_img = sitk.ReadImage(str(pat_root / f"{pat_id}_rss_target_dcml.mha"))
+    r1_arr = sitk.GetArrayFromImage(r1_img)
+
+    roi_arr, _ = get_combined_rois_array(pat_root, r1_img, r1_arr)
+
+    prost_seg = sitk.ReadImage(str(roots["reader_study_segs"] / f"{pat_id}_mlseg_total_mr.nii.gz"))
+    prost_arr = (sitk.GetArrayFromImage(prost_seg) == 17).astype(np.uint8)
+
+    return r1_arr, roi_arr, prost_arr
+
+
+def load_abs_and_uq_maps(
+    pat_id: str, roots: Dict[str, Path], acc: int, r1_arr: np.ndarray, do_blur: bool
+) -> Tuple[np.ndarray, np.ndarray]:
+    recon_path = roots["reader_study"] / pat_id / f"{pat_id}_VSharp_R{acc}_recon_dcml.mha"
+    recon_arr = sitk.GetArrayFromImage(sitk.ReadImage(str(recon_path)))
+    abs_arr = np.abs(r1_arr - recon_arr)
+
+    uq_path = roots[f"R{acc}"] / pat_id / f"uq_map_R{acc}_gm25.nii.gz"
+    uq_arr = sitk.GetArrayFromImage(sitk.ReadImage(str(uq_path)))
+
+    if do_blur:
+        abs_arr = apply_gaussian_blur_3d(abs_arr, sigma_xy=1.0, sigma_z=0.0)
+        uq_arr = apply_gaussian_blur_3d(uq_arr, sigma_xy=1.0, sigma_z=0.0)
+
+    return abs_arr, uq_arr
+
+
+def compute_region_metrics(abs_vals: np.ndarray, uq_vals: np.ndarray) -> Dict[str, float]:
+    cv_map = uq_vals / (abs_vals + 1e-8)
+    return {
+        "mean_abs": np.mean(abs_vals),
+        "mean_uq": np.mean(uq_vals),
+        "mean_cv_map": np.mean(cv_map),
+        "std_cv_map": np.std(cv_map),
+        "pearson_corr": np.corrcoef(abs_vals, uq_vals)[0, 1],
+        "spearman_corr": spearmanr(abs_vals, uq_vals).correlation,
+    }
+
+
+def compute_slice_level_stats_v2(
     pat_id: str,
-    roots: Dict[Union[int, str], Path],
+    roots: Dict[str, Path],
+    acc_factors: List[int],
+    uq_method: str = "gaussian",
+    do_blurring: bool = False,
+    debug: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Compute per-slice statistics for a patient across acceleration factors and regions.
+
+    Returns:
+        List[Dict[str, Any]]: long-format rows (one per slice × region × acc_factor)
+    """
+    r1_arr, roi_arr, prost_arr = load_reference_and_masks(pat_id, roots)
+
+    all_rows = []
+
+    for acc in acc_factors:
+        abs_arr, uq_arr = load_abs_and_uq_maps(pat_id, roots, acc, r1_arr, do_blurring)
+
+        for i in range(r1_arr.shape[0]):
+            regions = {
+                "slice": None,
+                "prostate": prost_arr[i] == 1,
+                "lesion": roi_arr[i] > 0,
+            }
+
+            for region_name, mask in regions.items():
+                if mask is not None and not np.any(mask):
+                    continue
+
+                abs_vals = abs_arr[i] if mask is None else abs_arr[i][mask]
+                uq_vals = uq_arr[i] if mask is None else uq_arr[i][mask]
+
+                if abs_vals.size < 2 or uq_vals.size < 2:
+                    continue
+
+                metrics = compute_region_metrics(abs_vals, uq_vals)
+                row = {
+                    "pat_id": pat_id,
+                    "slice_idx": i,
+                    "acc_factor": acc,
+                    "uq_method": uq_method,
+                    "region": region_name,
+                    **metrics,
+                }
+                all_rows.append(row)
+
+    if debug:
+        print(f"✅ {pat_id}: {len(all_rows)} slice × region stats computed.")
+        print(pd.DataFrame(all_rows).head())
+
+    return all_rows
+
+
+
+def compute_slice_level_stats_v1(
+    pat_id: str,
+    roots: Dict[str, Path],
     acc_factors: List[int],
     do_blurring: bool = False,
     undersamp_method: str = "gaussian",
     debug: bool = False,
 ) -> List[Dict[str, Any]]:
-    """
-    Compute slice-level statistics for a single patient.
-
-    Args:
-        pat_id (str): Patient ID.
-        roots (Dict[Union[int, str], Path]): Dictionary of paths for data.
-        acc_factors (List[int]): Acceleration factors to process.
-        debug (bool): If True, print debug information.
-
-    Returns:
-        List[Dict[str, Any]]: List of dictionaries containing slice-level statistics.
-    """
 
     # Load R1 and Load lesion
     pat_root          = roots['reader_study'] / pat_id
@@ -193,14 +282,14 @@ def compute_slice_level_stats(
 
 
 def process_patients_and_store_stats(
-    pat_ids: List[str],
-    roots: Dict[str, Path],
-    acc_factors: List[int],
-    db_fpath: Path,
-    table_name: str       = "uq_vs_abs_stats",
-    do_blurring: bool     = False,
-    undersamp_method: str = "gaussian",
-    debug: bool           = False,
+    pat_ids: List[str]      = None,
+    acc_factors: List[int]  = None,
+    uq_method: str          = "gaussian",
+    roots: Dict[str, Path]  = None,
+    db_fpath: Path          = None,    
+    table_name: str         = "uq_vs_abs_stats",
+    do_blurring: bool       = False,
+    debug: bool             = False,
 ):
     """
     Process multiple patients, compute slice-level statistics, and store them in a SQLite database.
@@ -218,172 +307,151 @@ def process_patients_and_store_stats(
     """
     all_stats = []
 
-    # Process each patient
+    # Level 2: Process each patient
     for idx, pat_id in enumerate(pat_ids):
         print(f"\n{idx + 1}/{len(pat_ids)} Processing patient {pat_id}...")
-        slice_stats = compute_slice_level_stats(
+        patient_stats = compute_slice_level_stats_v2(
             pat_id           = pat_id,
             roots            = roots,
             acc_factors      = acc_factors,
             do_blurring      = do_blurring,
-            undersamp_method = undersamp_method,
+            undersamp_method = uq_method,
             debug            = debug,
         )
-        all_stats.extend(slice_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
-    stats_df = pd.DataFrame(all_stats)
+        all_stats.extend(patient_stats)   # extend is not append. Extend does: [1, 2] [3, 4] becomes [1,2,3,4] instead of [1, 2, [3, 4]]
+    long_df = pd.DataFrame(all_stats)
 
     # Store in SQLite database
     print(f"\nStoring results in SQLite database: {db_fpath}")
     with sqlite3.connect(str(db_fpath)) as conn:
-        stats_df.to_sql(table_name, conn, if_exists="replace", index=False)
+        long_df.to_sql(table_name, conn, if_exists="replace", index=False)
     print(f"Data successfully stored in table '{table_name}'.")
 
     if debug:
         print(f"\nPreview of stored data:")
-        print(stats_df.head())
+        print(long_df.head())
 
 
-def create_table_if_not_exists(db_fpath: Path, table_name: str, debug: bool = False):
+
+def create_table_if_not_exists(db_fpath: Path, table_name: str, debug: bool = False) -> str:
     """
-    Create a new table in the SQLite database if it does not already exist.
-    If debug is True, '_debug' is appended to the table name.
+    Create a long-format SQLite table to store per-slice UQ vs error statistics.
 
     Args:
-        db_fpath (Path): Path to the SQLite database file.
-        table_name (str): Name of the table to create.
-        debug (bool): If True, append '_debug' to the table name.
+        db_fpath (str): Path to the SQLite database file.
+        table_name (str): Base name of the table to be created.
+        debug (bool): If True, appends '_debug' to the table name.
 
     Returns:
-        str: The final table name used.
+        str: Final table name used.
     """
-    # Append '_debug' to the table name if debug is True
-    final_table_name = f"{table_name}_debug" if debug else table_name
+    final_table = f"{table_name}_debug" if debug else table_name
 
-    # Define the SQL command to create the table
-    create_table_sql = f"""
-    CREATE TABLE IF NOT EXISTS {final_table_name} (
+    schema = f"""
+    CREATE TABLE IF NOT EXISTS {final_table} (
         pat_id TEXT,
         slice_idx INTEGER,
         acc_factor INTEGER,
-        undersampling_method TEXT,
-        mean_abs_slice REAL,
-        median_abs_slice REAL,
-        min_abs_slice REAL,
-        max_abs_slice REAL,
-        std_abs_slice REAL,
-        mean_uq_slice REAL,
-        median_uq_slice REAL,
-        min_uq_slice REAL,
-        max_uq_slice REAL,
-        std_uq_slice REAL,
-        pearson_corr_slice REAL,
-        spearman_corr_slice REAL,
-        mean_abs_prostate REAL,
-        median_abs_prostate REAL,
-        min_abs_prostate REAL,
-        max_abs_prostate REAL,
-        std_abs_prostate REAL,
-        mean_uq_prostate REAL,
-        median_uq_prostate REAL,
-        min_uq_prostate REAL,
-        max_uq_prostate REAL,
-        std_uq_prostate REAL,
-        pearson_corr_prostate REAL,
-        spearman_corr_prostate REAL,
-        mean_abs_lesion REAL,
-        median_abs_lesion REAL,
-        min_abs_lesion REAL,
-        max_abs_lesion REAL,
-        std_abs_lesion REAL,
-        mean_uq_lesion REAL,
-        median_uq_lesion REAL,
-        min_uq_lesion REAL,
-        max_uq_lesion REAL,
-        std_uq_lesion REAL,
-        pearson_corr_lesion REAL,
-        spearman_corr_lesion REAL
+        uq_method TEXT,
+        region TEXT,
+        mean_abs REAL,
+        mean_uq REAL,
+        mean_cv_map REAL,
+        std_cv_map REAL,
+        pearson_corr REAL,
+        spearman_corr REAL
     );
     """
 
-    # Connect to the database and execute the SQL command
-    try:
-        with sqlite3.connect(str(db_fpath)) as conn:
-            cursor = conn.cursor()
-            cursor.execute(create_table_sql)
-            conn.commit()
-        print(f"Table '{final_table_name}' created successfully (or already exists).")
-    except sqlite3.Error as e:
-        print(f"SQLite error while creating table '{final_table_name}': {e}")
-        raise
+    conn = sqlite3.connect(str(db_fpath))
+    cursor = conn.cursor()
+    cursor.execute(schema)
+    conn.commit()
+    conn.close()
 
-    return final_table_name
-
+    return final_table
 
 
 if __name__ == '__main__':
 
-    # All patient IDs to consider for Uncertainty Quantification
-    pat_ids = [
-        '0003_ANON5046358',
-        '0004_ANON9616598',
-        '0005_ANON8290811',
-        '0006_ANON2379607',
+
+    # The Theory:
+    # LEVEL1 - for uq_method in uq_methods:
+    # LEVEL2 -   for pat_id in pat_ids:
+    # LEVEL3 -      for acc_factor in acc_factors:
+    # LEVEL4 -          for slice_idx in range(num_slices):
+    # LEVEL5 -              for region_name, mask in regions.items():
+    #                            # Compute stats
+
+
+    # Configurable Parameters
+    do_blurring      = True
+    VERBOSE          = True
+    DEBUG            = True
+    TABLENAME        = "uq_vs_error_correlation_cv"  # Base name for the SQLite table to store results
+
+    # Essential Statistical Parameters for Uncertainty Quantification
+    pat_ids     = [
+        # '0003_ANON5046358',
+        # '0004_ANON9616598',
+        # '0005_ANON8290811',
+        # '0006_ANON2379607',
         '0007_ANON1586301',
-        '0008_ANON8890538',
-        '0010_ANON7748752',
-        '0011_ANON1102778',
-        '0012_ANON4982869',
-        '0013_ANON7362087',
-        '0014_ANON3951049',
-        '0015_ANON9844606',
-        '0018_ANON9843837',
-        '0019_ANON7657657',
-        '0020_ANON1562419',
-        '0021_ANON4277586',
-        '0023_ANON6964611',
-        '0024_ANON7992094',
-        '0026_ANON3620419',
-        '0027_ANON9724912',
-        '0028_ANON3394777',
-        '0029_ANON7189994',
-        '0030_ANON3397001',
-        '0031_ANON9141039',
-        '0032_ANON7649583',
-        '0033_ANON9728185',
-        '0035_ANON3474225',
-        '0036_ANON0282755',
-        '0037_ANON0369080',
-        '0039_ANON0604912',
-        '0042_ANON9423619',
-        '0043_ANON7041133',
-        '0044_ANON8232550',
-        '0045_ANON2563804',
-        '0047_ANON3613611',
-        '0048_ANON6365688',
-        '0049_ANON9783006',
-        '0051_ANON1327674',
-        '0052_ANON9710044',
-        '0053_ANON5517301',
-        '0055_ANON3357872',
-        '0056_ANON2124757',
-        '0057_ANON1070291',
-        '0058_ANON9719981',
-        '0059_ANON7955208',
-        '0061_ANON7642254',
-        '0062_ANON0319974',
-        '0063_ANON9972960',
-        '0064_ANON0282398',
-        '0067_ANON0913099',
-        '0068_ANON7978458',
-        '0069_ANON9840567',
-        '0070_ANON5223499',
-        '0071_ANON9806291',
-        '0073_ANON5954143',
-        '0075_ANON5895496',
-        '0076_ANON3983890',
-        '0077_ANON8634437',
-        '0078_ANON6883869',
-        '0079_ANON8828023',
+        # '0008_ANON8890538',
+        # '0010_ANON7748752',
+        # '0011_ANON1102778',
+        # '0012_ANON4982869',
+        # '0013_ANON7362087',
+        # '0014_ANON3951049',
+        # '0015_ANON9844606',
+        # '0018_ANON9843837',
+        # '0019_ANON7657657',
+        # '0020_ANON1562419',
+        # '0021_ANON4277586',
+        # '0023_ANON6964611',
+        # '0024_ANON7992094',
+        # '0026_ANON3620419',
+        # '0027_ANON9724912',
+        # '0028_ANON3394777',
+        # '0029_ANON7189994',
+        # '0030_ANON3397001',
+        # '0031_ANON9141039',
+        # '0032_ANON7649583',
+        # '0033_ANON9728185',
+        # '0035_ANON3474225',
+        # '0036_ANON0282755',
+        # '0037_ANON0369080',
+        # '0039_ANON0604912',
+        # '0042_ANON9423619',
+        # '0043_ANON7041133',
+        # '0044_ANON8232550',
+        # '0045_ANON2563804',
+        # '0047_ANON3613611',
+        # '0048_ANON6365688',
+        # '0049_ANON9783006',
+        # '0051_ANON1327674',
+        # '0052_ANON9710044',
+        # '0053_ANON5517301',
+        # '0055_ANON3357872',
+        # '0056_ANON2124757',
+        # '0057_ANON1070291',
+        # '0058_ANON9719981',
+        # '0059_ANON7955208',
+        # '0061_ANON7642254',
+        # '0062_ANON0319974',
+        # '0063_ANON9972960',
+        # '0064_ANON0282398',
+        # '0067_ANON0913099',
+        # '0068_ANON7978458',
+        # '0069_ANON9840567',
+        # '0070_ANON5223499',
+        # '0071_ANON9806291',
+        # '0073_ANON5954143',
+        # '0075_ANON5895496',
+        # '0076_ANON3983890',
+        # '0077_ANON8634437',
+        # '0078_ANON6883869',
+        # '0079_ANON8828023',
         # '0080_ANON4499321',
         # '0081_ANON9763928',
         # '0082_ANON6073234',
@@ -445,37 +513,37 @@ if __name__ == '__main__':
         # '0159_ANON9720717',
         # '0160_ANON3504149'
     ]
+    acc_factors = [3, 6] # Define the set of acceleration factors we care about.
+    uq_methods  = ["gaussian", "lxo"]
+    regions     = ["slice", "prostate", "lesion"]  # Regions to compute stats for
 
-    do_blurring      = True
-    acc_factors      = [3, 6] # Define the set of acceleration factors we care about.
-    DEBUG            = False
-    VERBOSE          = True
-    undersample_methods = ["gaussian", "lxo"]
 
-    for u_method in undersample_methods:
+    # Level 1: Uncertainty Quantification Method
+    for u_method in uq_methods:
         roots = {
             'reader_study':      Path('/scratch/hb-pca-rad/projects/03_reader_set_v2'),
             'reader_study_segs': Path('/scratch/hb-pca-rad/projects/03_reader_set_v2/segs'),
-            'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{3}x"),
-            'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{6}x"),
             'kspace_root':       Path('/scratch/p290820/datasets/003_umcg_pst_ksps'),
             'db_fpath_old':      Path('/scratch/p290820/datasets/003_umcg_pst_ksps/database/dbs/master_habrok_20231106_v2.db'),                 # References an OLDER version of the databases where the info could also just be fine that we are looking for
             'db_fpath_new':      Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db'),   # References the LATEST version of the databases where the info could also just be fine that we are looking for
+            'R3':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{3}x"),    # This path we can set dynamically later in the code on another level.
+            'R6':                Path(f"/scratch/hb-pca-rad/projects/04_uncertainty_quantification/{u_method}/recons_{6}x"),
         }
         
         table_name = create_table_if_not_exists(
             db_fpath   = roots["db_fpath_new"],
-            table_name = "uq_vs_error_correlation_cv",
+            table_name = TABLENAME,
             debug      = DEBUG,
         )
 
+        # Level 2: Process patients and store statistics
         process_patients_and_store_stats(
             pat_ids          = pat_ids,
-            roots            = roots,
             acc_factors      = acc_factors,
+            uq_method        = u_method,
+            roots            = roots,
             db_fpath         = roots["db_fpath_new"],
             table_name       = table_name,
             do_blurring      = do_blurring,
-            undersamp_method = u_method,
             debug            = DEBUG,
         )
