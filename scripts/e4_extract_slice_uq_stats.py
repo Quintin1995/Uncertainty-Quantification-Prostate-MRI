@@ -117,16 +117,15 @@ def load_abs_and_uq_maps(
     return abs_arr, uq_arr
 
 
-def compute_region_metrics(abs_vals: np.ndarray, uq_vals: np.ndarray) -> Dict[str, float]:
-    cv_map = uq_vals / (abs_vals + 1e-8)
+def compute_region_metrics(voxelwise_error: np.ndarray, voxelwise_uq_cv: np.ndarray) -> Dict[str, np.float32]:
     return {
-        "mean_abs": np.mean(abs_vals),
-        "mean_uq": np.mean(uq_vals),
-        "mean_cv_map": np.mean(cv_map),
-        "std_cv_map": np.std(cv_map),
-        "pearson_corr": np.corrcoef(abs_vals, uq_vals)[0, 1],
-        "spearman_corr": spearmanr(abs_vals, uq_vals).correlation,
+        "mean_abs": np.mean(voxelwise_error),
+        "mean_uq": np.mean(voxelwise_uq_cv),  # Mean CV across region
+        "std_uq": np.std(voxelwise_uq_cv),    # Spread of CVs
+        "pearson_corr": np.corrcoef(voxelwise_error, voxelwise_uq_cv)[0, 1],
+        "spearman_corr": spearmanr(voxelwise_error, voxelwise_uq_cv).correlation,
     }
+
 
 
 def compute_slice_level_stats_v2(
@@ -161,13 +160,13 @@ def compute_slice_level_stats_v2(
                 if mask is not None and not np.any(mask):
                     continue
 
-                abs_vals = abs_arr[i] if mask is None else abs_arr[i][mask]
-                uq_vals = uq_arr[i] if mask is None else uq_arr[i][mask]
+                voxelwise_error = abs_arr[i] if mask is None else abs_arr[i][mask]
+                voxelwise_uq_cv = uq_arr[i] if mask is None else uq_arr[i][mask]
 
-                if abs_vals.size < 2 or uq_vals.size < 2:
+                if voxelwise_error.size < 2 or voxelwise_uq_cv.size < 2:
                     continue
 
-                metrics = compute_region_metrics(abs_vals, uq_vals)
+                metrics = compute_region_metrics(voxelwise_error, voxelwise_uq_cv)
                 row = {
                     "pat_id": pat_id,
                     "slice_idx": i,
@@ -356,8 +355,7 @@ def create_table_if_not_exists(db_fpath: Path, table_name: str, debug: bool = Fa
         region TEXT,
         mean_abs REAL,
         mean_uq REAL,
-        mean_cv_map REAL,
-        std_cv_map REAL,
+        std_uq REAL,
         pearson_corr REAL,
         spearman_corr REAL
     );
