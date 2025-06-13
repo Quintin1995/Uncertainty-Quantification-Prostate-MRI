@@ -513,6 +513,7 @@ if __name__ == '__main__':
     verbose     = True
     debug       = False
     tablename   = "uq_vs_error_correlation_cv"  # Base name for the SQLite table to store results
+    tablename   = "uq_vs_error_correlation_std"  # Base name for the SQLite table to store results
     db_fpath    = Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db')
     
     # === Calculated Params ===
