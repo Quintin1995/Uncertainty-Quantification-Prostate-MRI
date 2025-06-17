@@ -155,14 +155,15 @@ def load_abs_and_uq_maps(
     acc: int,
     r1_arr: np.ndarray,
     do_blur: bool,
-    uq_method: str = "gaussian"
+    uq_method: str = "gaussian",
+    uq_metric: str = "std",
 ) -> Tuple[np.ndarray, np.ndarray]:
     
     recon_path = roots["reader_study"] / pat_id / f"{pat_id}_VSharp_R{acc}_recon_dcml.mha"
     recon_arr = sitk.GetArrayFromImage(sitk.ReadImage(str(recon_path)))
     abs_arr = np.abs(r1_arr - recon_arr)
 
-    uq_path = roots[f"R{acc}"] / pat_id / f"uq_map_R{acc}_{uq_method}.nii.gz"
+    uq_path = roots[f"R{acc}"] / pat_id / f"uq_map_R{acc}_{uq_method}_{uq_metric}.nii.gz"
     uq_arr = sitk.GetArrayFromImage(sitk.ReadImage(str(uq_path)))
 
     if do_blur:
@@ -189,6 +190,7 @@ def compute_slice_level_stats(
     roots: Dict[str, Path],
     acc_factors: List[int],
     uq_method: str = "gaussian",
+    uq_metric: str = "std",
     do_blurring: bool = False,
     debug: bool = False,
 ) -> List[Dict[str, Any]]:
@@ -206,7 +208,7 @@ def compute_slice_level_stats(
 
     for acc in acc_factors:
         LOGGER.info(f"🚀 Acceleration factor R={acc} with {uq_method}")
-        abs_arr, uq_arr = load_abs_and_uq_maps(pat_id, roots, acc, r1_arr, do_blurring, uq_method)
+        abs_arr, uq_arr = load_abs_and_uq_maps(pat_id, roots, acc, r1_arr, do_blurring, uq_method, uq_metric)
         # LOGGER.info(f"  ➤ abs_arr shape: {abs_arr.shape}, uq_arr shape: {uq_arr.shape}")
 
         for i in range(r1_arr.shape[0]):
@@ -251,6 +253,7 @@ def process_patients_and_store_stats(
     pat_ids: List[str]      = None,
     acc_factors: List[int]  = None,
     uq_method: str          = "gaussian",
+    uq_metric: str          = "std",
     roots: Dict[str, Path]  = None,
     db_fpath: Path          = None,    
     table_name: str         = "uq_vs_abs_stats",
@@ -273,12 +276,13 @@ def process_patients_and_store_stats(
 
         LOGGER.info(f"🔄 {idx + 1}/{len(pat_ids)} Processing patient {pat_id}...")
         patient_stats = compute_slice_level_stats(
-            pat_id           = pat_id,
-            roots            = roots,
-            acc_factors      = acc_factors,
-            uq_method        = uq_method,
-            do_blurring      = do_blurring,
-            debug            = debug,
+            pat_id      = pat_id,
+            roots       = roots,
+            acc_factors = acc_factors,
+            uq_method   = uq_method,
+            uq_metric   = uq_metric,
+            do_blurring = do_blurring,
+            debug       = debug,
         )
         all_stats.extend(patient_stats)
         processed_count += 1
@@ -376,10 +380,17 @@ def patient_exists_in_table(
 
 
 
-
-# ------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Main execution block
 if __name__ == '__main__':
+
+    # Step 1: Initialize parameters and logging
+    # Step 2: Define patient IDs, acceleration factors, UQ methods, and regions of interest
+    # Step 3: Create or drop the SQLite table if it exists
+    # Step 4: Loop through UQ methods, patients, and acceleration factors
+    # Step 5: Compute slice-level statistics and store them in the database
+    # step 6: Log the results and completion status
+    # step 7: Exit gracefully
 
     # === Statistical Parameters for Uncertainty Quantification ===
     pat_ids     = [
@@ -505,19 +516,23 @@ if __name__ == '__main__':
         '0160_ANON3504149'
     ]
     acc_factors = [3, 6] # Define the set of acceleration factors we care about.
-    uq_methods  = ["gaussian", "lxo"]
+    uq_methods  = ["gaussian", "lxo"] # UQ methods to process (e.g., "gaussian", "lxo")
     regions     = ["slice", "prostate", "lesion"]  # Regions to compute stats for
+    uq_metric   = "std"  # Metric to use for uncertainty quantification (e.g., "std" for standard deviation) 
 
     # === Configurable Params ===
     do_blurring = True
     verbose     = True
     debug       = False
-    tablename   = "uq_vs_error_correlation_cv"  # Base name for the SQLite table to store results
-    tablename   = "uq_vs_error_correlation_std"  # Base name for the SQLite table to store results
+    tablename   = f"uq_vs_error_correlation_{uq_metric}"  # Base name for the SQLite table to store results
     db_fpath    = Path('/home1/p290820/repos/Uncertainty-Quantification-Prostate-MRI/databases/master_habrok_20231106_v2.db')
     
     # === Calculated Params ===
     tablename = f"{tablename}_debug" if debug else tablename
+    uq_metrics = {  
+        'std': "std",
+        'cv': "",
+    }
     
     # === Initialization ===
     LOGGER.info(f"Parameters: do_blurring={do_blurring}, verbose={verbose}, debug={debug}, tablename={tablename}")
@@ -553,6 +568,7 @@ if __name__ == '__main__':
             pat_ids          = pat_ids,
             acc_factors      = acc_factors,
             uq_method        = u_method,
+            uq_metric        = uq_metrics[uq_metric],  # or "cv" depending on the method
             roots            = roots,
             db_fpath         = db_fpath,
             table_name       = tablename,

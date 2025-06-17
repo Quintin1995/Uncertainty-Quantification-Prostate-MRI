@@ -68,7 +68,6 @@ def calculate_uncertainty_map(
     return uq
 
 
-
 def apply_percentile_threshold(uq_map: np.ndarray, percentile: float = 95.0, debug=False) -> np.ndarray:
     """
     Apply a percentile threshold to the uncertainty map, keeping only the top percentile values.
