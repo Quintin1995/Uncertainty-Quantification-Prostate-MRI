@@ -176,3 +176,4 @@ cython_debug/
 /jupyter_env
 /tmp
 /databases
+/figures
